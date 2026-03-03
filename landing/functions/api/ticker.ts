@@ -35,7 +35,7 @@ const LOGOS: Record<string, string> = {
   "XAG/USD": "",
 };
 
-export const onRequest: PagesFunction<Env> = async (context) => {
+export async function onRequest(context: { env: Env }) {
   const apiKey = context.env.TWELVE_DATA_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "API key not configured" }), {
