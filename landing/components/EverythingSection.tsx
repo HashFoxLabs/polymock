@@ -24,7 +24,7 @@ export default function EverythingSection() {
             Everything You Need to Experiment Markets
           </h2>
           <p className="text-lg lg:text-xl text-white max-w-3xl mx-auto">
-            The on-chain sandbox for modern traders. Paper-trade on live data and backtest on historical data — all verifiable on Solana.
+            The on-chain sandbox for modern traders. Paper-trade on live data and backtest on historical data, all verifiable on Solana.
           </p>
         </motion.div>
 

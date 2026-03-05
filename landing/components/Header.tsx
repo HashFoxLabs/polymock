@@ -1,10 +1,14 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 export default function Header() {
   const [scrollY, setScrollY] = useState(0);
+  const pathname = usePathname();
+  const isHome = pathname === "/";
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -41,19 +45,38 @@ export default function Header() {
       }}
     >
       <div className="flex justify-between items-center px-3 sm:px-6 py-2 sm:py-3">
-        <div className="flex items-center gap-0.5">
-          <div className="relative h-14 w-14 sm:h-16 sm:w-16">
-            <Image
-              src="/hashfoxlogo.png"
-              alt="HashFox Labs Logo"
-              fill
-              className="object-contain scale-150"
-            />
-          </div>
-          <span className="text-sm sm:text-xl text-white font-medium flex items-center h-14 sm:h-16">
-            HashFox Labs
-          </span>
-        </div>
+        {isHome ? (
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="flex items-center gap-0.5"
+          >
+            <div className="relative h-14 w-14 sm:h-16 sm:w-16">
+              <Image
+                src="/hashfoxlogo.png"
+                alt="HashFox Labs Logo"
+                fill
+                className="object-contain scale-150"
+              />
+            </div>
+            <span className="text-sm sm:text-xl text-white font-medium flex items-center h-14 sm:h-16">
+              HashFox Labs
+            </span>
+          </button>
+        ) : (
+          <Link href="/" className="flex items-center gap-0.5">
+            <div className="relative h-14 w-14 sm:h-16 sm:w-16">
+              <Image
+                src="/hashfoxlogo.png"
+                alt="HashFox Labs Logo"
+                fill
+                className="object-contain scale-150"
+              />
+            </div>
+            <span className="text-sm sm:text-xl text-white font-medium flex items-center h-14 sm:h-16">
+              HashFox Labs
+            </span>
+          </Link>
+        )}
 
         <nav className="hidden md:flex items-center gap-4 lg:gap-8 h-14 sm:h-16">
           <button
@@ -69,10 +92,9 @@ export default function Header() {
             FAQ
           </button>
           <button
-            onClick={() => document.getElementById("community-section")?.scrollIntoView({ behavior: "smooth" })}
-            className="text-sm lg:text-base text-gray-300 hover:text-orange-500 transition-colors"
+            className="text-sm lg:text-base text-gray-300 hover:text-orange-500 transition-colors cursor-default"
           >
-            Community
+            Docs
           </button>
         </nav>
 

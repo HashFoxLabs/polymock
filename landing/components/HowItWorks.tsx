@@ -14,7 +14,7 @@ const steps = [
     number: 2,
     title: "Pick a Market",
     description:
-      "Choose from crypto, prediction markets, forex, or stocks — all available on a single platform.",
+      "Choose from crypto, prediction markets, forex, or stocks, all available on a single platform.",
   },
   {
     number: 3,
@@ -54,29 +54,33 @@ export default function HowItWorks() {
       </div>
 
       <div className="max-w-7xl mx-auto relative z-10">
+        {/* Header — full width above */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          viewport={{ once: true }}
+          className="mb-12"
+        >
+          <h2 className="text-4xl lg:text-5xl font-bold mb-4 text-orange-500">
+            How It Works
+          </h2>
+          <p className="text-2xl lg:text-3xl text-orange-500">
+            Four simple steps
+          </p>
+        </motion.div>
+
+        {/* Content — text + image aligned */}
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left side - Steps */}
-          <div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-4xl lg:text-5xl font-bold mb-4 text-orange-500">
-                How It Works
-              </h2>
-              <p className="text-2xl lg:text-3xl text-orange-500 mb-12">
-                Four simple steps
-              </p>
-              <p className="text-lg text-white mb-12">
-                Experience professional-grade backtesting and paper trading tools
-                designed for both novice and experienced traders.
-              </p>
-            </motion.div>
+          {/* Left side */}
+          <div className="flex flex-col">
+            <p className="text-lg text-white mb-12 text-justify">
+              Experience professional-grade backtesting and paper trading tools
+              designed for both novice and experienced traders.
+            </p>
 
             <motion.div
-              className="space-y-8"
+              className="space-y-8 flex-1"
               variants={{
                 hidden: { opacity: 0 },
                 visible: {
@@ -123,7 +127,7 @@ export default function HowItWorks() {
                     <h3 className="text-xl font-bold text-white mb-2">
                       {step.title}
                     </h3>
-                    <p className="text-gray-300 leading-relaxed">
+                    <p className="text-gray-300 leading-relaxed text-justify">
                       {step.description}
                     </p>
                   </div>

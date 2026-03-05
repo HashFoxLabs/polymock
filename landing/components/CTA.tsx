@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 export default function CTA() {
   return (
-    <section id="community-section" className="relative py-20 px-6 bg-black">
+    <section id="community-section" className="relative pt-20 pb-0 px-6 bg-black">
       {/* SVG Grid Pattern Background */}
       <div className="absolute inset-0 opacity-20">
         <svg width="100%" height="100%">
@@ -41,14 +41,22 @@ export default function CTA() {
           <p className="text-lg lg:text-xl text-gray-400 max-w-2xl mx-auto mb-8">
             Connect with other traders, share strategies, give feedback, and stay updated on new product releases.
           </p>
-          <button
-            onClick={() =>
-              window.open("https://t.me/hashfoxlabs", "_blank")
-            }
-            className="bg-orange-500 hover:bg-orange-600 px-8 py-3 rounded-full font-semibold text-black hover:scale-105 transition-all text-lg"
-          >
-            Join Telegram →
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button
+              onClick={() => window.location.href = "/community"}
+              className="bg-orange-500 hover:bg-orange-600 px-8 py-3 rounded-full font-semibold text-black hover:scale-105 transition-all text-lg"
+            >
+              Community Hub →
+            </button>
+            <button
+              onClick={() =>
+                window.open("https://t.me/hashfoxlabs", "_blank")
+              }
+              className="glass-dark px-8 py-3 rounded-full font-semibold text-white border border-gray-600 hover:border-orange-500 hover:scale-105 transition-all text-lg"
+            >
+              Join Telegram
+            </button>
+          </div>
         </motion.div>
 
         <motion.div
@@ -56,8 +64,8 @@ export default function CTA() {
           whileInView={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
-          className="flex justify-center overflow-hidden rounded-2xl mx-auto"
-          style={{ width: 400, height: 400 }}
+          className="flex justify-center mx-auto overflow-hidden"
+          style={{ width: 350, height: 350 }}
         >
           <video
             src="/hashfox.mp4"
@@ -67,7 +75,7 @@ export default function CTA() {
             playsInline
             width={400}
             height={400}
-            className="max-w-full h-auto mix-blend-screen scale-110 brightness-125 saturate-150"
+            className="max-w-none mix-blend-screen scale-125 brightness-125 saturate-150"
           />
         </motion.div>
       </div>

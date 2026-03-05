@@ -16,20 +16,20 @@ export default function FeatureCards() {
             viewport={{ once: true }}
             className="screenshot !bg-black p-8 rounded-2xl flex flex-col border border-orange-500/20"
           >
-            <div className="mb-4 w-44 h-44 mx-auto">
+            <div className="mb-4 w-32 h-32 mx-auto">
               <Image
                 src="/images/fox-data.png"
                 alt="Fox Data"
-                width={176}
-                height={176}
+                width={128}
+                height={128}
                 className="w-full h-full object-contain"
               />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-4">
+            <h3 className="text-2xl font-bold text-white mb-4 text-center">
               Universal Data Aggregation
             </h3>
-            <p className="text-base text-gray-400 leading-relaxed mb-6">
-              We aggregate historical data across all markets — crypto, prediction markets, forex, and stocks — into one unified platform.
+            <p className="text-base text-gray-400 leading-relaxed mb-6 text-center">
+              We aggregate historical data across all markets: crypto, prediction markets, forex, and stocks, into one unified platform.
             </p>
 
             <div className="mt-auto bg-black/40 rounded-xl p-4 border border-orange-500/20">
@@ -62,19 +62,19 @@ export default function FeatureCards() {
             viewport={{ once: true }}
             className="screenshot !bg-black p-8 rounded-2xl flex flex-col border border-orange-500/20"
           >
-            <div className="mb-4 w-44 h-44 mx-auto">
+            <div className="mb-4 w-32 h-32 mx-auto">
               <Image
                 src="/images/fox-trading.png"
                 alt="Fox Trading"
-                width={176}
-                height={176}
+                width={128}
+                height={128}
                 className="w-full h-full object-contain"
               />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-4">
+            <h3 className="text-2xl font-bold text-white mb-4 text-center">
               Live Paper Trading
             </h3>
-            <p className="text-base text-gray-400 leading-relaxed mb-6">
+            <p className="text-base text-gray-400 leading-relaxed mb-6 text-center">
               Trade on real-time live data with zero risk. Test your strategies against live market conditions before committing real capital.
             </p>
 
@@ -111,20 +111,20 @@ export default function FeatureCards() {
             viewport={{ once: true }}
             className="screenshot !bg-black p-8 rounded-2xl flex flex-col border border-orange-500/20"
           >
-            <div className="mb-4 w-44 h-44 mx-auto">
+            <div className="mb-4 w-32 h-32 mx-auto">
               <Image
                 src="/images/fox-win.png"
                 alt="Fox Win"
-                width={176}
-                height={176}
+                width={128}
+                height={128}
                 className="w-full h-full object-contain"
               />
             </div>
-            <h3 className="text-2xl font-bold text-white mb-4">
+            <h3 className="text-2xl font-bold text-white mb-4 text-center">
               Precision Backtesting
             </h3>
-            <p className="text-base text-gray-400 leading-relaxed mb-6">
-              Backtest with precision on historical data using advanced strategies. Every entry, exit, stop-loss, and return is statistically validated.
+            <p className="text-base text-gray-400 leading-relaxed mb-6 text-center">
+              Backtest with precision on historical data using your strategies. Every entry, exit, stop-loss, and return is statistically validated.
             </p>
 
             <div className="mt-auto bg-black/40 rounded-xl p-4 border border-teal-500/20">

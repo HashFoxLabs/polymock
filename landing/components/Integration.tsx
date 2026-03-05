@@ -40,8 +40,8 @@ export default function Integration() {
             <div className="inline-block bg-yellow-500/20 px-4 py-2 rounded-full border border-yellow-400/30 mb-4">
               <span className="text-yellow-400 font-medium text-sm">In Development</span>
             </div>
-            <p className="text-lg lg:text-xl text-gray-300 leading-relaxed">
-              We&apos;re building a unified platform to paper-trade across all markets — crypto, prediction markets, forex, and stocks — with one single balance. Trade everything from one place.
+            <p className="text-lg lg:text-xl text-gray-300 leading-relaxed text-justify">
+              We&apos;re building a unified platform to paper-trade across all markets: crypto, prediction markets, forex, and stocks, with one single balance. Trade everything from one place.
             </p>
           </motion.div>
         </div>

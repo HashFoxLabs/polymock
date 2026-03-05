@@ -60,9 +60,10 @@ export default function Hero() {
             Start Paper Trading →
           </button>
           <button
-            className="glass-dark px-8 py-3 rounded-full font-semibold text-white border border-gray-600 hover:border-orange-500 hover:scale-105 hover:shadow-xl hover:shadow-orange-500/30 transition-all cursor-default"
+            onClick={() => window.location.href = "/community"}
+            className="glass-dark px-8 py-3 rounded-full font-semibold text-white border border-gray-600 hover:border-orange-500 hover:scale-105 hover:shadow-xl hover:shadow-orange-500/30 transition-all"
           >
-            Documentation
+            Community Hub
           </button>
         </motion.div>
       </div>

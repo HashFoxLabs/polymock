@@ -13,16 +13,16 @@ export default function CustomProduct() {
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
           id="custom-product-section"
-          className="bg-black rounded-2xl border border-orange-500/20 p-8 lg:p-12 text-center scroll-mt-96"
+          className="p-8 lg:p-12 text-center scroll-mt-96"
         >
           <h3 className="text-2xl lg:text-3xl font-bold text-white mb-4">
             Need a Custom Product?
           </h3>
-          <p className="text-gray-300 max-w-3xl mx-auto mb-4 text-lg">
-            We build specialized trading and DeFi products across various ecosystems — lending protocols, AI integrations, on-chain analytics, automated strategies, and more.
+          <p className="text-gray-300 max-w-3xl mx-auto mb-4 text-lg text-center">
+            We build specialized trading and DeFi products across various ecosystems: lending protocols, AI integrations, on-chain analytics, automated strategies, and more.
           </p>
-          <p className="text-gray-400 max-w-3xl mx-auto mb-8 text-base">
-            With experience shipping multiple products at hackathons and in production, we move fast and deliver. Whether you need a DeFi protocol, an AI-powered tool, or a custom smart contract solution — we can build it for you.
+          <p className="text-gray-400 max-w-3xl mx-auto mb-8 text-base text-center">
+            With experience shipping multiple products at hackathons and in production, we move fast and deliver. Whether you need a DeFi protocol, an AI-powered tool, or a custom smart contract solution, we can build it for you.
           </p>
           <button
             onClick={() => window.open("https://cal.com/hashfoxlabs", "_blank")}

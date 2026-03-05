@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 
 export default function DetailedFeature() {
   return (
-    <section className="py-20 px-6 bg-gray-900/30">
+    <section className="py-20 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left side - Text */}
@@ -19,7 +19,7 @@ export default function DetailedFeature() {
             <h2 className="text-3xl lg:text-4xl font-bold mb-6 text-white leading-tight">
               Access to advanced backtesting with Risk Management
             </h2>
-            <p className="text-lg lg:text-xl text-gray-300 leading-relaxed">
+            <p className="text-lg lg:text-xl text-gray-300 leading-relaxed text-justify">
               Every strategy is stress-tested across historical market data before execution. Understand win rates, drawdowns, and expected returns in a zero-risk environment.
             </p>
           </motion.div>

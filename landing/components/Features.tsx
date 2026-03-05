@@ -17,7 +17,7 @@ const mainApps = [
     title: "Blockberg",
     description:
       "Paper trading and backtesting for crypto markets. Test strategies on live and historical data across crypto assets.",
-    link: "https://blockberg.hashfoxlabs.com/",
+    link: "https://blockberg.vercel.app/terminal",
     linkText: "Open Blockberg",
     badge: "Production",
     badgeColor: "bg-orange-500",
@@ -76,7 +76,7 @@ export default function Features() {
                 <h3 className="text-xl lg:text-2xl font-bold text-orange-500 mb-3 lg:mb-4">
                   {item.title}
                 </h3>
-                <p className="text-sm lg:text-base text-gray-400 leading-relaxed mb-4 flex-grow">
+                <p className="text-sm lg:text-base text-gray-400 leading-relaxed mb-4 flex-grow text-justify">
                   {item.description}
                 </p>
                 {item.link && (
