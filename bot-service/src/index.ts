@@ -130,7 +130,7 @@ class SLTPBot {
   > {
     try {
       // Fetch all position accounts
-      const accounts = await this.program.account.predictionPosition.all();
+      const accounts = await (this.program.account as any).predictionPosition.all();
 
       // Filter for active positions with SL or TP set
       return accounts.filter((acc: any) => {

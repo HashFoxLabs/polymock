@@ -1,0 +1,26 @@
+# fly.toml app configuration file generated for polymock-bot on 2026-03-06T16:15:46+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'polymock-bot'
+primary_region = 'sin'
+
+[build]
+  dockerfile = 'Dockerfile'
+
+[processes]
+  worker = 'node dist/index.js'
+
+[deploy]
+  strategy = 'immediate'
+  min_machines_running = 1
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '256mb'
+  cpus = 1
+  memory_mb = 256
+  processes = ['worker']
+  auto_stop = false
+  auto_start = true
