@@ -14,7 +14,7 @@ const IDL = JSON.parse(readFileSync(join(__dirname, 'idl.json'), 'utf-8'));
 
 dotenv.config();
 
-const PROGRAM_ID = new PublicKey('5sfoR6jyPc4dmdQuuAEpMPPV18aJcXLJxBhqiCv69Q3V');
+const PROGRAM_ID = new PublicKey('6a5sw2ZVXkAqPF5F8jSvBFVWZSBenaMGnRjnhPoVD31Z');
 const RPC_URL = process.env.RPC_URL || 'https://api.devnet.solana.com';
 const POLYMARKET_CLOB_API = 'https://clob.polymarket.com';
 const POLYMARKET_GAMMA_API = 'https://gamma-api.polymarket.com';
