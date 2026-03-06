@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import WalletButton from '$lib/wallet/WalletButton.svelte';
-	import { walletStore, setWalletAdapter, updateWalletConnection, initializeUserAccountIfNeeded } from '$lib/wallet/stores';
+	import { walletStore, setWalletAdapter, updateWalletConnection, initializeUserAccountIfNeeded, createUserAccount } from '$lib/wallet/stores';
 	import { authStore, loginWithGoogle } from '$lib/auth/auth-store';
 	import { sessionKeyManager } from '$lib/solana/session-keys';
 	import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
@@ -33,19 +33,34 @@
 	let sessionLoading = false;
 	let showSessionDropdown = false;
 	let sessionBadgeElement: HTMLElement;
+	let showInitPopup = false;
+	let lastCheckedWallet: string | null = null;
 
 	walletStore.subscribe(value => {
+		const prevWallet = walletState.publicKey?.toString() ?? null;
 		walletState = value;
+		const currentWallet = walletState.publicKey?.toString() ?? null;
+
+		// Wallet changed — clear stale session if it belongs to previous wallet
+		if (currentWallet && currentWallet !== prevWallet) {
+			if (sessionKeyManager.isSessionActive() && !sessionKeyManager.isSessionForWallet(walletState.publicKey)) {
+				sessionKeyManager.clearSession();
+			}
+		}
 		checkSessionStatus();
 	});
 
 	function checkSessionStatus() {
-		sessionActive = sessionKeyManager.isSessionActive();
-		if (sessionActive) {
+		// Only show session as active if it belongs to the current wallet
+		if (walletState.publicKey && sessionKeyManager.isSessionActive() && sessionKeyManager.isSessionForWallet(walletState.publicKey)) {
+			sessionActive = true;
 			const remaining = sessionKeyManager.getSessionTimeRemaining();
 			const hours = Math.floor(remaining / 3600);
 			const mins = Math.floor((remaining % 3600) / 60);
 			sessionTimeRemaining = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+		} else {
+			sessionActive = false;
+			sessionTimeRemaining = '';
 		}
 	}
 
@@ -55,6 +70,12 @@
 			showSessionActiveNotice = true;
 		} else {
 			showSessionPrompt = true;
+		}
+	}
+
+	function showInitPopupIfNeeded() {
+		if (walletState.connected && !walletState.userAccountInitialized && !walletState.loading) {
+			showInitPopup = true;
 		}
 	}
 
@@ -129,8 +150,7 @@
 					const directWallet = createPhantomWrapper(provider, publicKey);
 					setWalletAdapter(directWallet as any);
 					await updateWalletConnection();
-					await initializeUserAccountIfNeeded(directWallet);
-					showSessionPopup();
+					await handlePostConnect(directWallet);
 				} catch {
 					localStorage.removeItem(WALLET_STORAGE_KEY);
 				}
@@ -142,12 +162,26 @@
 				if (adapter.connected && adapter.publicKey) {
 					setWalletAdapter(adapter);
 					await updateWalletConnection();
-					await initializeUserAccountIfNeeded(adapter);
-					showSessionPopup();
+					await handlePostConnect(adapter);
 				}
 			} catch {
 				localStorage.removeItem(WALLET_STORAGE_KEY);
 			}
+		}
+	}
+
+	/** Unified post-connect flow: check account → show init popup or session popup */
+	async function handlePostConnect(wallet: any) {
+		try {
+			await initializeUserAccountIfNeeded(wallet);
+		} catch (e) {
+			console.error('Error checking account:', e);
+		}
+		// After checking, if account not initialized show init popup, otherwise show session popup
+		if (!walletState.userAccountInitialized) {
+			showInitPopup = true;
+		} else {
+			showSessionPopup();
 		}
 	}
 
@@ -167,9 +201,12 @@
 
 		initializing = true;
 		try {
-			const { initializeUserAccountIfNeeded } = await import('$lib/wallet/stores');
-			await initializeUserAccountIfNeeded(walletState.adapter);
-			alert('Account initialized successfully with 10,000 USDC!');
+			await createUserAccount(walletState.adapter);
+			showInitPopup = false;
+			// Chain into session popup after successful init
+			if (walletState.userAccountInitialized) {
+				showSessionPopup();
+			}
 		} catch (error: any) {
 			console.error('Failed to initialize:', error);
 			alert(`Failed to initialize account: ${error.message || 'Unknown error'}`);
@@ -190,6 +227,9 @@
 	}
 
 	async function handleLogout() {
+		// Clear session key
+		sessionKeyManager.clearSession();
+		sessionActive = false;
 		// Disconnect wallet if connected
 		if (walletState.connected && walletState.adapter) {
 			try {
@@ -201,6 +241,9 @@
 		// Logout Google auth
 		authStore.logout();
 		showProfileDropdown = false;
+		showInitPopup = false;
+		showSessionPrompt = false;
+		showSessionActiveNotice = false;
 	}
 
 	function toggleProfileDropdown() {
@@ -304,12 +347,6 @@
 		{/if}
 
 		{#if walletState.connected}
-			{#if !walletState.userAccountInitialized && !walletState.loading}
-				<button class="initialize-btn" on:click={handleInitialize} disabled={initializing}>
-					{initializing ? 'Initializing...' : 'Initialize Account (0.1 SOL)'}
-				</button>
-			{/if}
-
 			{#if walletState.userAccountInitialized}
 				<div class="balance-display">
 					<span class="balance-label">Balance:</span>
@@ -467,7 +504,7 @@
 								<div class="connect-option-subtitle">Sign in with Google</div>
 							</div>
 						</button>
-						<WalletButton isDropdownMode={true} onClose={() => showConnectDropdown = false} onConnected={showSessionPopup} />
+						<WalletButton isDropdownMode={true} onClose={() => showConnectDropdown = false} onConnected={() => handlePostConnect(walletState.adapter)} />
 					</div>
 				{/if}
 			</div>
@@ -475,6 +512,40 @@
 
 	</div>
 </div>
+
+<!-- Account initialization popup -->
+{#if showInitPopup && walletState.connected && !walletState.userAccountInitialized}
+	<div class="session-overlay" on:keydown={(e) => e.key === 'Escape' && e.preventDefault()} role="dialog" tabindex="0">
+		<div class="session-modal" on:click|stopPropagation on:keydown|stopPropagation role="dialog" tabindex="-1">
+			<div class="session-status-dot pending"></div>
+			<h3 class="session-title">Initialize Your Account</h3>
+			<p class="session-desc">
+				Your wallet is connected but you don't have a trading account yet. Initialize to get 10,000 USDC for paper trading.
+			</p>
+			<div class="session-details">
+				<div class="session-detail-row">
+					<span class="detail-label">Entry fee</span>
+					<span class="detail-value">0.1 SOL</span>
+				</div>
+				<div class="session-detail-row">
+					<span class="detail-label">Starting balance</span>
+					<span class="detail-value">10,000 USDC</span>
+				</div>
+				<div class="session-detail-row">
+					<span class="detail-label">Network</span>
+					<span class="detail-value">Devnet</span>
+				</div>
+			</div>
+			<button class="session-primary-btn enable-btn" on:click={handleInitialize} disabled={initializing}>
+				{#if initializing}
+					Initializing...
+				{:else}
+					Initialize Account (0.1 SOL)
+				{/if}
+			</button>
+		</div>
+	</div>
+{/if}
 
 <!-- Session active notice popup -->
 {#if showSessionActiveNotice}

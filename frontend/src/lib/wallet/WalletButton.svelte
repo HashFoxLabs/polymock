@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { walletStore, setWalletAdapter, setWalletConnecting, setWalletDisconnecting, updateWalletConnection, initializeUserAccountIfNeeded } from './stores';
+	import { walletStore, setWalletAdapter, setWalletConnecting, setWalletDisconnecting, updateWalletConnection } from './stores';
 	import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 	import type { Adapter } from '@solana/wallet-adapter-base';
 
@@ -110,13 +110,6 @@
 
 						setWalletAdapter(directWallet as any);
 						await updateWalletConnection();
-
-						try {
-							await initializeUserAccountIfNeeded(directWallet);
-						} catch (initError) {
-							console.error('Failed to initialize user account:', initError);
-						}
-
 						setWalletConnecting(false);
 						onConnected?.();
 						return;
@@ -136,11 +129,6 @@
 			// Adapter-based fallback
 			wallet.on('connect', async () => {
 				updateWalletConnection();
-				try {
-					await initializeUserAccountIfNeeded(wallet);
-				} catch (initError) {
-					console.error('Failed to initialize user account:', initError);
-				}
 			});
 
 			wallet.on('disconnect', () => {

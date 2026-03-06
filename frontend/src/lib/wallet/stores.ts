@@ -163,7 +163,7 @@ export function setWalletLoading(loading: boolean) {
 }
 
 /**
- * Initialize user account and fetch balance
+ * Check if user account exists and fetch balance (does NOT create account)
  */
 export async function initializeUserAccountIfNeeded(wallet: any) {
 	try {
@@ -175,7 +175,6 @@ export async function initializeUserAccountIfNeeded(wallet: any) {
 		setWalletLoading(true);
 
 		// Initialize the Solana program with MagicBlock RPC
-		// MagicBlock RPC automatically handles ER routing - no delegation needed!
 		await polymarketService.initializeProgram(wallet);
 
 		const userPublicKey = new PublicKey(wallet.publicKey.toString());
@@ -183,25 +182,52 @@ export async function initializeUserAccountIfNeeded(wallet: any) {
 		// Check if user account exists
 		const exists = await polymarketService.checkUserAccount(userPublicKey);
 
-		if (!exists) {
-			// Initialize with 0.1 SOL entry fee
-			await polymarketService.initializeUserAccount(wallet, 0.1);
+		if (exists) {
+			// Fetch user account data
+			const userAccount = await polymarketService.getUserAccount(userPublicKey);
+			if (userAccount) {
+				const balance = userAccount.usdcBalance.toNumber() / 1_000_000;
+				setUserBalance(balance);
+				setUserAccountInitialized(true);
+			}
+		} else {
+			// Account doesn't exist — don't auto-create, let the popup handle it
+			setUserAccountInitialized(false);
 		}
+	} catch (error: any) {
+		console.error('Error checking user account:', error);
+	} finally {
+		setWalletLoading(false);
+	}
+}
+
+/**
+ * Create the user account on-chain (called from init popup)
+ */
+export async function createUserAccount(wallet: any) {
+	try {
+		if (!wallet || !wallet.publicKey) {
+			throw new Error('No wallet connected');
+		}
+
+		setWalletLoading(true);
+
+		await polymarketService.initializeProgram(wallet);
+		const userPublicKey = new PublicKey(wallet.publicKey.toString());
+
+		// Initialize with 0.1 SOL entry fee
+		await polymarketService.initializeUserAccount(wallet, 0.1);
 
 		// Fetch user account data
 		const userAccount = await polymarketService.getUserAccount(userPublicKey);
 		if (userAccount) {
-			const balance = userAccount.usdcBalance.toNumber() / 1_000_000; // Convert from 6 decimals
+			const balance = userAccount.usdcBalance.toNumber() / 1_000_000;
 			setUserBalance(balance);
 			setUserAccountInitialized(true);
 		}
 	} catch (error: any) {
-		console.error('Error initializing user account:', error);
-		console.error('Error details:', {
-			message: error?.message,
-			code: error?.code,
-			stack: error?.stack
-		});
+		console.error('Error creating user account:', error);
+		throw error;
 	} finally {
 		setWalletLoading(false);
 	}
