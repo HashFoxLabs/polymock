@@ -268,6 +268,25 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
   const [commentsLoaded, setCommentsLoaded] = useState(!trade.isFromDb);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(trade.likes);
+  const [likeChecked, setLikeChecked] = useState(false);
+  const [likeMessage, setLikeMessage] = useState<string | null>(null);
+
+  // Check if user already liked this post
+  useEffect(() => {
+    if (!connectedUser || !trade.isFromDb || !trade.dbId || likeChecked) return;
+    const checkLike = async () => {
+      const { data } = await supabase
+        .from("post_likes")
+        .select("id")
+        .eq("user_id", connectedUser.userId)
+        .eq("post_id", trade.dbId!)
+        .eq("post_type", trade.dbType || "trade")
+        .maybeSingle();
+      if (data) setLiked(true);
+      setLikeChecked(true);
+    };
+    checkLike();
+  }, [connectedUser, trade.isFromDb, trade.dbId, trade.dbType, likeChecked]);
 
   const formatPrice = (price: number) =>
     price < 10 ? `$${price.toFixed(3)}` : `$${price.toLocaleString()}`;
@@ -295,12 +314,45 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
   }, [trade.isFromDb, trade.dbId, trade.dbType, commentsLoaded]);
 
   const handleLike = async () => {
-    setLiked((l) => !l);
-    setLikeCount((c) => (liked ? c - 1 : c + 1));
-    // For real posts, update Supabase counter (best-effort, no auth required for display)
+    if (!connectedUser) {
+      setLikeMessage("Connect to like posts");
+      setTimeout(() => setLikeMessage(null), 2000);
+      return;
+    }
+    if (liked) {
+      setLikeMessage("Already liked");
+      setTimeout(() => setLikeMessage(null), 2000);
+      return;
+    }
+
+    // Optimistic UI update
+    setLiked(true);
+    setLikeCount((c) => c + 1);
+
     if (trade.isFromDb && trade.dbId) {
+      // Insert like record
+      const { error: likeErr } = await supabase.from("post_likes").insert({
+        user_id: connectedUser.userId,
+        post_id: trade.dbId,
+        post_type: trade.dbType || "trade",
+      });
+
+      if (likeErr) {
+        // Duplicate or error — revert
+        setLiked(true); // keep liked state since it already exists
+        setLikeCount((c) => c - 1);
+        if (likeErr.code === "23505") {
+          setLikeMessage("Already liked");
+        } else {
+          setLikeMessage("Failed to like");
+        }
+        setTimeout(() => setLikeMessage(null), 2000);
+        return;
+      }
+
+      // Update counter on the post
       const countTable = trade.dbType === "trade" ? "trades" : "backtest_strategies";
-      const newCount = liked ? likeCount - 1 : likeCount + 1;
+      const newCount = likeCount + 1;
       await supabase.from(countTable).update({ likes_count: Math.max(0, newCount) }).eq("id", trade.dbId);
     }
   };
@@ -349,20 +401,34 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
 
   // Shared like/comment buttons
   const actionButtons = (
-    <div className="flex items-center gap-3 mt-auto pt-3 border-t border-gray-800">
-      <button
-        onClick={handleLike}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-sm ${
-          liked
-            ? "bg-orange-500/15 text-orange-400 border-orange-500/30"
-            : "bg-white/[0.03] border-gray-800 text-gray-400 hover:text-orange-400 hover:border-orange-500/30"
-        }`}
-      >
-        <svg className="w-4 h-4" fill={liked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-        </svg>
-        <span>{likeCount}</span>
-      </button>
+    <div className="flex items-center gap-3 mt-auto pt-3 border-t border-gray-800 relative">
+      <div className="relative">
+        <button
+          onClick={handleLike}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-sm ${
+            liked
+              ? "bg-orange-500/15 text-orange-400 border-orange-500/30 cursor-default"
+              : "bg-white/[0.03] border-gray-800 text-gray-400 hover:text-orange-400 hover:border-orange-500/30"
+          }`}
+        >
+          <svg className="w-4 h-4" fill={liked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          <span>{likeCount}</span>
+        </button>
+        <AnimatePresence>
+          {likeMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4 }}
+              className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 rounded-md bg-gray-800 border border-gray-700 text-xs text-gray-300 shadow-lg z-10"
+            >
+              {likeMessage}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
       <button
         onClick={handleToggleComments}
         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors text-sm ${

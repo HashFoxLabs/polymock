@@ -261,18 +261,30 @@
 
 			const { publicKey, wallet, userInfo } = result;
 
-			// Embedded wallets start with 0 SOL — airdrop on devnet so they can init + create sessions
-			try {
-				const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
-				const balance = await conn.getBalance(publicKey);
-				if (balance < 0.2 * LAMPORTS_PER_SOL) {
-					console.log('[Web3Auth] Low balance, requesting devnet airdrop...');
-					const sig = await conn.requestAirdrop(publicKey, 1 * LAMPORTS_PER_SOL);
-					await conn.confirmTransaction(sig, 'confirmed');
-					console.log('[Web3Auth] Airdrop confirmed:', sig);
+			// Embedded wallets start with 0 SOL — airdrop on devnet so they can init
+			const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+			const balance = await conn.getBalance(publicKey);
+			if (balance < 0.2 * LAMPORTS_PER_SOL) {
+				console.log('[Web3Auth] Low balance (' + (balance / LAMPORTS_PER_SOL) + ' SOL), requesting devnet airdrop...');
+				let airdropSuccess = false;
+				for (let attempt = 0; attempt < 3 && !airdropSuccess; attempt++) {
+					try {
+						if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
+						const sig = await conn.requestAirdrop(publicKey, 1 * LAMPORTS_PER_SOL);
+						await conn.confirmTransaction(sig, 'confirmed');
+						console.log('[Web3Auth] Airdrop confirmed:', sig);
+						airdropSuccess = true;
+					} catch (err) {
+						console.warn(`[Web3Auth] Airdrop attempt ${attempt + 1} failed:`, err);
+					}
 				}
-			} catch (airdropErr) {
-				console.warn('[Web3Auth] Devnet airdrop failed (non-fatal):', airdropErr);
+				if (!airdropSuccess) {
+					// Verify balance again — airdrop may have landed despite confirmation error
+					const updatedBalance = await conn.getBalance(publicKey);
+					if (updatedBalance < 0.2 * LAMPORTS_PER_SOL) {
+						alert('Unable to fund your wallet with devnet SOL. The devnet faucet may be rate-limited. Please try again in a few minutes, or manually airdrop SOL to:\n\n' + publicKey.toString());
+					}
+				}
 			}
 
 			// Set auth store with user info from Web3Auth
@@ -417,40 +429,40 @@
 					<span class="balance-amount">${walletState.usdcBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
 				</div>
 				<div class="session-dropdown-container">
-					{#if sessionActive}
-						<button class="session-btn active" on:click={toggleSessionDropdown} bind:this={sessionBadgeElement}>
-							<span class="session-btn-dot active"></span>
-							<span class="session-btn-label">Session Active</span>
-							<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-								<path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-							</svg>
-						</button>
+						{#if sessionActive}
+							<button class="session-btn active" on:click={toggleSessionDropdown} bind:this={sessionBadgeElement}>
+								<span class="session-btn-dot active"></span>
+								<span class="session-btn-label">Session Active</span>
+								<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+									<path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+								</svg>
+							</button>
 
-						{#if showSessionDropdown && sessionBadgeElement}
-							<div class="session-dropdown" style="top: {sessionBadgeElement.getBoundingClientRect().bottom + 8}px; right: {window.innerWidth - sessionBadgeElement.getBoundingClientRect().right}px;">
-								<div class="session-dropdown-header">
-									<span class="session-dropdown-dot"></span>
-									<div class="session-dropdown-info">
-										<div class="session-dropdown-title">One-Click Trading</div>
-										<div class="session-dropdown-time">{sessionTimeRemaining} remaining</div>
+							{#if showSessionDropdown && sessionBadgeElement}
+								<div class="session-dropdown" style="top: {sessionBadgeElement.getBoundingClientRect().bottom + 8}px; right: {window.innerWidth - sessionBadgeElement.getBoundingClientRect().right}px;">
+									<div class="session-dropdown-header">
+										<span class="session-dropdown-dot"></span>
+										<div class="session-dropdown-info">
+											<div class="session-dropdown-title">One-Click Trading</div>
+											<div class="session-dropdown-time">{sessionTimeRemaining} remaining</div>
+										</div>
 									</div>
+									<div class="session-dropdown-divider"></div>
+									<button class="session-dropdown-item disconnect" on:click={disconnectSession}>
+										<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+											<path d="M6 14H3C2.44772 14 2 13.5523 2 13V3C2 2.44772 2.44772 2 3 2H6M11 11L14 8M14 8L11 5M14 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+										</svg>
+										Disconnect Session
+									</button>
 								</div>
-								<div class="session-dropdown-divider"></div>
-								<button class="session-dropdown-item disconnect" on:click={disconnectSession}>
-									<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-										<path d="M6 14H3C2.44772 14 2 13.5523 2 13V3C2 2.44772 2.44772 2 3 2H6M11 11L14 8M14 8L11 5M14 8H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-									</svg>
-									Disconnect Session
-								</button>
-							</div>
+							{/if}
+						{:else}
+							<button class="session-btn inactive" on:click={showSessionPopup}>
+								<span class="session-btn-dot inactive"></span>
+								<span class="session-btn-label">No Session</span>
+							</button>
 						{/if}
-					{:else}
-						<button class="session-btn inactive" on:click={showSessionPopup}>
-							<span class="session-btn-dot inactive"></span>
-							<span class="session-btn-label">No Session</span>
-						</button>
-					{/if}
-				</div>
+					</div>
 			{/if}
 
 			{#if walletState.loading}
@@ -1225,22 +1237,23 @@
 	}
 
 	.connect-btn {
-		padding: 9px 24px;
-		background: #F97316;
-		border: none;
-		border-radius: 9999px;
-		color: #000000;
+		padding: 8px 20px;
+		background: transparent;
+		border: 1px solid rgba(249, 115, 22, 0.85);
+		border-radius: 8px;
+		color: #FFFFFF;
 		font-family: Inter, sans-serif;
-		font-size: 14px;
-		font-weight: 600;
+		font-size: 13px;
+		font-weight: 500;
 		cursor: pointer;
 		white-space: nowrap;
-		transition: background 0.2s ease;
-		letter-spacing: 0.01em;
+		transition: all 0.15s ease;
+		letter-spacing: 0.02em;
 	}
 
 	.connect-btn:hover {
-		background: #ea580c;
+		background: rgba(255, 255, 255, 0.08);
+		border-color: rgba(249, 115, 22, 1);
 	}
 
 	.connect-dropdown {
