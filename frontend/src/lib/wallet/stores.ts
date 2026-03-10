@@ -39,20 +39,15 @@ export const walletStore = writable<WalletState>(initialState);
  * Check if wallet has a username in Supabase, flag needsUsername if not
  */
 export async function checkUsername(walletAddress: string) {
-	console.log('[checkUsername] Checking username for wallet:', walletAddress);
 	const { data, error } = await supabase
 		.from('users')
 		.select('username, avatar_url')
 		.eq('wallet_address', walletAddress)
 		.maybeSingle();
 
-	console.log('[checkUsername] Supabase response:', { data, error });
-
 	if (data?.username) {
-		console.log('[checkUsername] Username found:', data.username, 'avatarUrl:', data.avatar_url);
 		walletStore.update(s => ({ ...s, username: data.username, avatarUrl: data.avatar_url || null, needsUsername: false }));
 	} else {
-		console.log('[checkUsername] No username found, showing modal');
 		walletStore.update(s => ({ ...s, username: null, avatarUrl: null, needsUsername: true }));
 	}
 }
@@ -135,7 +130,7 @@ export async function updateWalletConnection() {
 				});
 
 				if (response.ok) {
-					console.log('✅ Wallet authenticated successfully');
+					// Wallet authenticated
 
 					// Link wallet to Google account if authenticated
 					const auth = get(authStore);

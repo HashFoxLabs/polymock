@@ -199,7 +199,7 @@ export class SessionKeyManager {
 		const sig = await this.connection.sendRawTransaction(signed.serialize());
 		await this.connection.confirmTransaction(sig, 'confirmed');
 
-		console.log('Session created:', sig);
+		// Session created on-chain
 
 		// Persist to localStorage
 		this.storeSession({
@@ -258,7 +258,8 @@ export class SessionKeyManager {
 	isSessionForWallet(walletPubkey: PublicKey): boolean {
 		const session = this.loadSession();
 		if (!session) return false;
-		return session.authority === walletPubkey.toBase58();
+		const addr = walletPubkey.toBase58?.() ?? walletPubkey.toString();
+		return session.authority === addr;
 	}
 
 	/**
@@ -305,6 +306,7 @@ export class SessionKeyManager {
 	 * Clear session from local storage only (no on-chain revoke)
 	 */
 	clearSession(): void {
+		console.trace('[SessionKey] clearSession called');
 		if (typeof localStorage !== 'undefined') {
 			localStorage.removeItem(SESSION_STORAGE_KEY);
 		}

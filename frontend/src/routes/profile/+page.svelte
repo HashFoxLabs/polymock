@@ -350,6 +350,8 @@
 			if (updateErr) throw new Error(updateErr.message);
 
 			profileAvatarUrl = avatarUrl;
+			// Update wallet store so Navbar avatar reflects the change
+			walletStore.update(s => ({ ...s, avatarUrl }));
 		} catch (err: any) {
 			console.error('Avatar upload error:', err);
 			alert('Failed to upload avatar: ' + err.message);

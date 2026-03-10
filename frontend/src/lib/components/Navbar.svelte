@@ -3,9 +3,11 @@
 	import { page } from '$app/stores';
 	import WalletButton from '$lib/wallet/WalletButton.svelte';
 	import { walletStore, setWalletAdapter, updateWalletConnection, initializeUserAccountIfNeeded, createUserAccount } from '$lib/wallet/stores';
-	import { authStore, loginWithGoogle } from '$lib/auth/auth-store';
+	import { authStore } from '$lib/auth/auth-store';
+	import { initWeb3Auth, connectWeb3Auth, disconnectWeb3Auth, createWeb3AuthWalletAdapter } from '$lib/auth/web3auth';
 	import { sessionKeyManager } from '$lib/solana/session-keys';
 	import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+	import { Connection, LAMPORTS_PER_SOL } from '@solana/web3.js';
 	import hashfoxLogo from '$lib/assets/hashfoxlogo.png';
 
 	declare global {
@@ -53,7 +55,8 @@
 
 	function checkSessionStatus() {
 		// Only show session as active if it belongs to the current wallet
-		if (walletState.publicKey && sessionKeyManager.isSessionActive() && sessionKeyManager.isSessionForWallet(walletState.publicKey)) {
+		const pk = walletState.publicKey;
+		if (pk && sessionKeyManager.isSessionActive() && sessionKeyManager.isSessionForWallet(pk)) {
 			sessionActive = true;
 			const remaining = sessionKeyManager.getSessionTimeRemaining();
 			const hours = Math.floor(remaining / 3600);
@@ -171,26 +174,61 @@
 		}
 	}
 
-	/** Unified post-connect flow: check account → show init popup or session popup */
+	/** Wait until the username modal is dismissed (needsUsername becomes false) */
+	function waitForUsernameComplete(): Promise<void> {
+		return new Promise(resolve => {
+			if (!walletState.needsUsername) return resolve();
+			const unsub = walletStore.subscribe(state => {
+				if (!state.needsUsername) {
+					unsub();
+					resolve();
+				}
+			});
+		});
+	}
+
+	/** Unified post-connect flow: check account → username → init popup or session popup */
 	async function handlePostConnect(wallet: any) {
 		try {
 			await initializeUserAccountIfNeeded(wallet);
 		} catch (e) {
 			console.error('Error checking account:', e);
 		}
-		// After checking, if account not initialized show init popup, otherwise show session popup
+
+		// Wait for Web3Auth confirmation modal to close
+		await new Promise(r => setTimeout(r, 800));
+
+		// If first-time user needs a username, wait for that modal to complete first
+		if (walletState.needsUsername) {
+			await waitForUsernameComplete();
+			// Small delay after username modal closes
+			await new Promise(r => setTimeout(r, 400));
+		}
+
+		// Now show the appropriate popup
 		if (!walletState.userAccountInitialized) {
 			showInitPopup = true;
 		} else {
-			showSessionPopup();
+			// Skip session popup entirely if an active session already exists for this wallet
+			const pubkey = walletState.publicKey;
+			if (pubkey && sessionKeyManager.isSessionActive() && sessionKeyManager.isSessionForWallet(pubkey)) {
+				sessionActive = true;
+				checkSessionStatus();
+			} else {
+				showSessionPopup();
+			}
 		}
 	}
 
-	onMount(() => {
+	onMount(async () => {
 		checkSessionStatus();
 		setInterval(() => {
 			if (sessionActive) checkSessionStatus();
 		}, 30000);
+
+		// Initialize Web3Auth early
+		await initWeb3Auth();
+
 		tryAutoReconnect();
 	});
 
@@ -218,7 +256,40 @@
 
 	async function handleConnectAccount() {
 		try {
-			const user = await loginWithGoogle();
+			const result = await connectWeb3Auth();
+			if (!result) return; // User cancelled
+
+			const { publicKey, wallet, userInfo } = result;
+
+			// Embedded wallets start with 0 SOL — airdrop on devnet so they can init + create sessions
+			try {
+				const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
+				const balance = await conn.getBalance(publicKey);
+				if (balance < 0.2 * LAMPORTS_PER_SOL) {
+					console.log('[Web3Auth] Low balance, requesting devnet airdrop...');
+					const sig = await conn.requestAirdrop(publicKey, 1 * LAMPORTS_PER_SOL);
+					await conn.confirmTransaction(sig, 'confirmed');
+					console.log('[Web3Auth] Airdrop confirmed:', sig);
+				}
+			} catch (airdropErr) {
+				console.warn('[Web3Auth] Devnet airdrop failed (non-fatal):', airdropErr);
+			}
+
+			// Set auth store with user info from Web3Auth
+			authStore.setUser({
+				id: publicKey.toString(),
+				email: userInfo.email || '',
+				name: userInfo.name || publicKey.toString().slice(0, 8) + '...',
+				picture: userInfo.profileImage || '',
+				walletAddress: publicKey.toString(),
+				createdAt: new Date()
+			});
+
+			// Create a wallet adapter wrapper and plug into wallet store
+			const adapterWrapper = createWeb3AuthWalletAdapter(wallet, publicKey);
+			setWalletAdapter(adapterWrapper as any);
+			await updateWalletConnection();
+			await handlePostConnect(adapterWrapper);
 		} catch (error: any) {
 			console.error('Login failed:', error);
 			if (error.message !== 'Authentication cancelled') {
@@ -228,8 +299,8 @@
 	}
 
 	async function handleLogout() {
-		// Clear session key
-		sessionKeyManager.clearSession();
+		// Don't clear session key on logout — it's still valid on-chain until expiry.
+		// Session will be restored automatically when the same wallet reconnects.
 		sessionActive = false;
 		// Disconnect wallet if connected
 		if (walletState.connected && walletState.adapter) {
@@ -239,8 +310,16 @@
 				console.error('Failed to disconnect wallet:', error);
 			}
 		}
-		// Logout Google auth
+		// Disconnect Web3Auth
+		try {
+			await disconnectWeb3Auth();
+		} catch (error) {
+			console.error('Failed to disconnect Web3Auth:', error);
+		}
+		// Logout auth
 		authStore.logout();
+		// Reset wallet store
+		setWalletAdapter(null);
 		showProfileDropdown = false;
 		showInitPopup = false;
 		showSessionPrompt = false;
@@ -331,22 +410,6 @@
 	</div>
 
 	<div class="navbar-right">
-		<!-- Social Links - hidden when wallet connected to save space -->
-		{#if !walletState.connected}
-			<div class="social-links">
-				<a href="https://x.com/polymockxyz" target="_blank" rel="noopener noreferrer" class="social-link" title="Follow us on X">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-						<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-					</svg>
-				</a>
-				<a href="https://t.me/+nxDZ0dMya1NhMDlk" target="_blank" rel="noopener noreferrer" class="social-link" title="Join us on Telegram">
-					<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-						<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-					</svg>
-				</a>
-			</div>
-		{/if}
-
 		{#if walletState.connected}
 			{#if walletState.userAccountInitialized}
 				<div class="balance-display">
@@ -498,23 +561,20 @@
 			<div class="connect-dropdown-container">
 				<button class="connect-btn" on:click={toggleConnectDropdown} bind:this={connectButtonElement}>
 					Connect
-					<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-						<path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-					</svg>
 				</button>
 
 				{#if showConnectDropdown && connectButtonElement}
 					<div class="connect-dropdown" style="top: {connectButtonElement.getBoundingClientRect().bottom + 8}px; right: {window.innerWidth - connectButtonElement.getBoundingClientRect().right}px;">
 						<button class="connect-option" on:click={() => { handleConnectAccount(); showConnectDropdown = false; }}>
-							<svg width="20" height="20" viewBox="0 0 18 18">
-								<path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18z"></path>
-								<path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17z"></path>
-								<path fill="#FBBC05" d="M4.5 10.52a4.8 4.8 0 0 1 0-3.04V5.41H1.83a8 8 0 0 0 0 7.18l2.67-2.07z"></path>
-								<path fill="#EA4335" d="M8.98 4.18c1.17 0 2.23.4 3.06 1.2l2.3-2.3A8 8 0 0 0 1.83 5.4L4.5 7.49a4.77 4.77 0 0 1 4.48-3.3z"></path>
+							<svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+								<rect width="20" height="20" rx="4" fill="url(#emailGrad)"/>
+								<path d="M4 7L10 11L16 7" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+								<rect x="3" y="5" width="14" height="10" rx="2" stroke="white" stroke-width="1.5"/>
+								<defs><linearGradient id="emailGrad" x1="0" y1="0" x2="20" y2="20"><stop stop-color="#F97316"/><stop offset="1" stop-color="#F59E0B"/></linearGradient></defs>
 							</svg>
 							<div class="connect-option-text">
-								<div class="connect-option-title">Google Account</div>
-								<div class="connect-option-subtitle">Sign in with Google</div>
+								<div class="connect-option-title">Quick Login</div>
+								<div class="connect-option-subtitle">Email, Google, or social</div>
 							</div>
 						</button>
 						<WalletButton isDropdownMode={true} onClose={() => showConnectDropdown = false} onConnected={() => handlePostConnect(walletState.adapter)} />
@@ -719,48 +779,6 @@
 		gap: 6px;
 		margin-left: auto;
 		flex-shrink: 0;
-	}
-
-	.social-links {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		padding-right: 8px;
-		border-right: 1px solid #2A2F45;
-		margin-right: 4px;
-		flex-shrink: 0;
-	}
-
-	.social-link {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 32px;
-		height: 32px;
-		border-radius: 6px;
-		text-decoration: none;
-		transition: all 0.2s ease;
-		border: none;
-	}
-
-	/* X (Twitter) specific styling */
-	.social-link:first-child {
-		background: #000000;
-		color: #FFFFFF;
-	}
-
-	.social-link:first-child:hover {
-		background: #1A1A1A;
-	}
-
-	/* Telegram specific styling */
-	.social-link:last-child {
-		background: #0088cc;
-		color: #FFFFFF;
-	}
-
-	.social-link:last-child:hover {
-		background: #0099dd;
 	}
 
 	.initialize-btn {
@@ -1207,25 +1225,22 @@
 	}
 
 	.connect-btn {
-		padding: 5px 12px;
-		background: #000000;
-		border: 1px solid #404040;
-		border-radius: 6px;
-		color: #FFFFFF;
+		padding: 9px 24px;
+		background: #F97316;
+		border: none;
+		border-radius: 9999px;
+		color: #000000;
 		font-family: Inter, sans-serif;
-		font-size: 12px;
+		font-size: 14px;
 		font-weight: 600;
 		cursor: pointer;
-		display: flex;
-		align-items: center;
-		gap: 5px;
 		white-space: nowrap;
+		transition: background 0.2s ease;
+		letter-spacing: 0.01em;
 	}
 
-	.connect-btn svg {
-		width: 16px;
-		height: 16px;
-		transition: transform 0.2s;
+	.connect-btn:hover {
+		background: #ea580c;
 	}
 
 	.connect-dropdown {
@@ -1536,36 +1551,6 @@
 			display: none;
 		}
 
-		.social-links {
-			border-right: none;
-			padding-right: 0;
-			margin-right: 0;
-		}
-	}
-
-	/* Light mode styles for social links */
-	:global(.light-mode) .social-links {
-		border-right-color: #E0E0E0;
-	}
-
-	/* X (Twitter) keeps black background in light mode */
-	:global(.light-mode) .social-link:first-child {
-		background: #000000;
-		color: #FFFFFF;
-	}
-
-	:global(.light-mode) .social-link:first-child:hover {
-		background: #1A1A1A;
-	}
-
-	/* Telegram keeps blue background in light mode */
-	:global(.light-mode) .social-link:last-child {
-		background: #0088cc;
-		color: #FFFFFF;
-	}
-
-	:global(.light-mode) .social-link:last-child:hover {
-		background: #0099dd;
 	}
 
 	/* Light mode styles for login button */
@@ -1656,10 +1641,6 @@
 			border-left: 3px solid #F97316;
 		}
 
-		.social-links {
-			gap: 8px;
-		}
-
 		.balance-display {
 			font-size: 12px;
 		}
@@ -1682,10 +1663,6 @@
 
 		.logo-subtitle {
 			font-size: 9px;
-		}
-
-		.social-links {
-			display: none;
 		}
 
 		.balance-display {
