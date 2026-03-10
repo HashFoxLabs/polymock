@@ -3,12 +3,21 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function Header() {
   const [scrollY, setScrollY] = useState(0);
   const pathname = usePathname();
+  const router = useRouter();
   const isHome = pathname === "/";
+
+  const scrollToOrNavigate = (sectionId: string) => {
+    if (isHome) {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+    } else {
+      router.push(`/#${sectionId}`);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -80,29 +89,27 @@ export default function Header() {
 
         <nav className="hidden md:flex items-center gap-4 lg:gap-8 h-14 sm:h-16">
           <button
-            onClick={() => document.getElementById("custom-product-section")?.scrollIntoView({ behavior: "smooth" })}
+            onClick={() => scrollToOrNavigate("custom-product-section")}
             className="text-sm lg:text-base text-gray-300 hover:text-orange-500 transition-colors"
           >
             Custom
           </button>
           <button
-            onClick={() => document.getElementById("faq-section")?.scrollIntoView({ behavior: "smooth" })}
+            onClick={() => scrollToOrNavigate("faq-section")}
             className="text-sm lg:text-base text-gray-300 hover:text-orange-500 transition-colors"
           >
             FAQ
           </button>
-          <button
-            className="text-sm lg:text-base text-gray-300 hover:text-orange-500 transition-colors cursor-default"
+          <Link
+            href="/community"
+            className="text-sm lg:text-base text-gray-300 hover:text-orange-500 transition-colors"
           >
-            Docs
-          </button>
+            Community
+          </Link>
         </nav>
 
         <button
-          onClick={() => {
-            const appsSection = document.getElementById("apps-section");
-            appsSection?.scrollIntoView({ behavior: "smooth" });
-          }}
+          onClick={() => scrollToOrNavigate("apps-section")}
           className="bg-orange-500 hover:bg-orange-600 text-black px-5 sm:px-6 py-2 sm:py-3 rounded-full font-medium transition-all text-sm"
         >
           <span className="hidden sm:inline">Launch Apps</span>
