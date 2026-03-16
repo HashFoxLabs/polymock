@@ -369,7 +369,7 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
     }
     return () => { document.body.style.overflow = ""; };
   }, [showDetail]);
-  const [comments, setComments] = useState<{ user: string; text: string; avatarUrl?: string }[]>(mockComments[trade.id] ?? []);
+  const [comments, setComments] = useState<{ id?: string; userId?: string; user: string; text: string; avatarUrl?: string }[]>(mockComments[trade.id] ?? []);
   const [commentsLoaded, setCommentsLoaded] = useState(!trade.isFromDb);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(trade.likes);
@@ -410,6 +410,8 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
       .order("created_at", { ascending: true });
     if (data) {
       setComments(data.map((c: any) => ({
+        id: c.id,
+        userId: c.user_id,
         user: c.users?.username || "anon",
         text: c.content,
         avatarUrl: c.users?.avatar_url || undefined,
@@ -425,28 +427,48 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
       setTimeout(() => setLikeMessage(null), 2000);
       return;
     }
+
     if (liked) {
-      setLikeMessage("Already liked");
-      setTimeout(() => setLikeMessage(null), 2000);
-      return;
-    }
-    setLiked(true);
-    setLikeCount((c) => c + 1);
-    if (trade.isFromDb && trade.dbId) {
-      const { error: likeErr } = await supabase.from("post_likes").insert({
-        user_id: connectedUser.userId,
-        post_id: trade.dbId,
-        post_type: trade.dbType || "trade",
-      });
-      if (likeErr) {
-        setLiked(true);
-        setLikeCount((c) => c - 1);
-        setLikeMessage(likeErr.code === "23505" ? "Already liked" : "Failed to like");
-        setTimeout(() => setLikeMessage(null), 2000);
-        return;
+      // Unlike
+      setLiked(false);
+      setLikeCount((c) => Math.max(0, c - 1));
+      if (trade.isFromDb && trade.dbId) {
+        const { error: unlikeErr } = await supabase
+          .from("post_likes")
+          .delete()
+          .eq("user_id", connectedUser.userId)
+          .eq("post_id", trade.dbId)
+          .eq("post_type", trade.dbType || "trade");
+        if (unlikeErr) {
+          setLiked(true);
+          setLikeCount((c) => c + 1);
+          setLikeMessage("Failed to unlike");
+          setTimeout(() => setLikeMessage(null), 2000);
+          return;
+        }
+        const countTable = trade.dbType === "trade" ? "trades" : "backtest_strategies";
+        await supabase.from(countTable).update({ likes_count: Math.max(0, likeCount - 1) }).eq("id", trade.dbId);
       }
-      const countTable = trade.dbType === "trade" ? "trades" : "backtest_strategies";
-      await supabase.from(countTable).update({ likes_count: Math.max(0, likeCount + 1) }).eq("id", trade.dbId);
+    } else {
+      // Like
+      setLiked(true);
+      setLikeCount((c) => c + 1);
+      if (trade.isFromDb && trade.dbId) {
+        const { error: likeErr } = await supabase.from("post_likes").insert({
+          user_id: connectedUser.userId,
+          post_id: trade.dbId,
+          post_type: trade.dbType || "trade",
+        });
+        if (likeErr) {
+          setLiked(false);
+          setLikeCount((c) => c - 1);
+          setLikeMessage(likeErr.code === "23505" ? "Already liked" : "Failed to like");
+          setTimeout(() => setLikeMessage(null), 2000);
+          return;
+        }
+        const countTable = trade.dbType === "trade" ? "trades" : "backtest_strategies";
+        await supabase.from(countTable).update({ likes_count: Math.max(0, likeCount + 1) }).eq("id", trade.dbId);
+      }
     }
   };
 
@@ -454,16 +476,47 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
     const trimmed = commentText.trim();
     if (!trimmed || !connectedUser) return;
     setSubmittingComment(true);
-    setComments((prev) => [...prev, { user: connectedUser.username, text: trimmed, avatarUrl: connectedUser.avatarUrl || undefined }]);
     setCommentText("");
     if (trade.isFromDb && trade.dbId) {
       const table = trade.dbType === "trade" ? "trade_comments" : "strategy_comments";
       const fk = trade.dbType === "trade" ? "trade_id" : "strategy_id";
-      await supabase.from(table).insert({ [fk]: trade.dbId, user_id: connectedUser.userId, content: trimmed });
+      const { data: inserted } = await supabase.from(table).insert({ [fk]: trade.dbId, user_id: connectedUser.userId, content: trimmed }).select("id").single();
+      setComments((prev) => [...prev, { id: inserted?.id, userId: connectedUser.userId, user: connectedUser.username, text: trimmed, avatarUrl: connectedUser.avatarUrl || undefined }]);
       const countTable = trade.dbType === "trade" ? "trades" : "backtest_strategies";
       await supabase.from(countTable).update({ comments_count: comments.length + 1 }).eq("id", trade.dbId);
+    } else {
+      setComments((prev) => [...prev, { user: connectedUser.username, text: trimmed, avatarUrl: connectedUser.avatarUrl || undefined }]);
     }
     setSubmittingComment(false);
+  };
+
+  const [editingCommentIdx, setEditingCommentIdx] = useState<number | null>(null);
+  const [editCommentText, setEditCommentText] = useState("");
+
+  const handleDeleteComment = async (idx: number) => {
+    const comment = comments[idx];
+    if (!comment) return;
+    setComments((prev) => prev.filter((_, i) => i !== idx));
+    if (trade.isFromDb && trade.dbId && comment.id) {
+      const table = trade.dbType === "trade" ? "trade_comments" : "strategy_comments";
+      await supabase.from(table).delete().eq("id", comment.id);
+      const countTable = trade.dbType === "trade" ? "trades" : "backtest_strategies";
+      await supabase.from(countTable).update({ comments_count: Math.max(0, comments.length - 1) }).eq("id", trade.dbId);
+    }
+  };
+
+  const handleEditComment = async (idx: number) => {
+    const trimmed = editCommentText.trim();
+    if (!trimmed) return;
+    const comment = comments[idx];
+    if (!comment) return;
+    setComments((prev) => prev.map((c, i) => i === idx ? { ...c, text: trimmed } : c));
+    setEditingCommentIdx(null);
+    setEditCommentText("");
+    if (trade.isFromDb && trade.dbId && comment.id) {
+      const table = trade.dbType === "trade" ? "trade_comments" : "strategy_comments";
+      await supabase.from(table).update({ content: trimmed }).eq("id", comment.id);
+    }
   };
 
   const openDetail = () => {
@@ -806,21 +859,62 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
                   {comments.length === 0 ? (
                     <p className="text-gray-600 text-sm text-center py-4">No comments yet. Be the first!</p>
                   ) : (
-                    comments.map((c, i) => (
-                      <div key={i} className="flex items-start gap-2.5">
-                        {c.avatarUrl ? (
-                          <img src={c.avatarUrl} alt={c.user} className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0 mt-0.5">
-                            <span className="text-orange-400 text-[10px] font-bold">{c.user[0]?.toUpperCase()}</span>
+                    comments.map((c, i) => {
+                      const isOwn = connectedUser && (c.userId === connectedUser.userId || c.user === connectedUser.username);
+                      const isEditing = editingCommentIdx === i;
+                      return (
+                        <div key={i} className="flex items-start gap-2.5 group/comment">
+                          {c.avatarUrl ? (
+                            <img src={c.avatarUrl} alt={c.user} className="w-6 h-6 rounded-full object-cover shrink-0 mt-0.5" />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                              <span className="text-orange-400 text-[10px] font-bold">{c.user[0]?.toUpperCase()}</span>
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <span className="text-orange-400 text-xs font-medium">@{c.user}</span>
+                            {isEditing ? (
+                              <div className="flex gap-2 mt-1">
+                                <input
+                                  type="text"
+                                  value={editCommentText}
+                                  onChange={(e) => setEditCommentText(e.target.value)}
+                                  onKeyDown={(e) => e.key === "Enter" && handleEditComment(i)}
+                                  className="flex-1 px-3 py-1.5 rounded-lg text-sm bg-white/5 border border-gray-700 text-white focus:outline-none focus:border-orange-500/50 transition-colors"
+                                  autoFocus
+                                />
+                                <button onClick={() => handleEditComment(i)} className="text-green-400 hover:text-green-300 text-xs font-medium px-2">Save</button>
+                                <button onClick={() => { setEditingCommentIdx(null); setEditCommentText(""); }} className="text-gray-500 hover:text-gray-300 text-xs font-medium px-2">Cancel</button>
+                              </div>
+                            ) : (
+                              <p className="text-gray-300 text-sm mt-0.5">{c.text}</p>
+                            )}
                           </div>
-                        )}
-                        <div className="min-w-0">
-                          <span className="text-orange-400 text-xs font-medium">@{c.user}</span>
-                          <p className="text-gray-300 text-sm mt-0.5">{c.text}</p>
+                          {isOwn && !isEditing && (
+                            <div className="flex gap-1 opacity-0 group-hover/comment:opacity-100 transition-opacity shrink-0 mt-0.5">
+                              <button
+                                onClick={() => { setEditingCommentIdx(i); setEditCommentText(c.text); }}
+                                className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-orange-400 transition-colors"
+                                title="Edit"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteComment(i)}
+                                className="p-1 rounded hover:bg-white/10 text-gray-500 hover:text-red-400 transition-colors"
+                                title="Delete"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 
