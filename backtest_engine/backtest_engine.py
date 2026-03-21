@@ -730,7 +730,7 @@ class BacktestEngine:
         }))
 
     def showcase_trades(self, page: int = 1, limit: int = 100, platform: str = "polymarket"):
-        """Fetch paginated trades - minimal version for debugging"""
+        """Fetch paginated trades - load files incrementally until we have enough"""
         
         # Validate platform and get file list (excluding macOS metadata files)
         if platform == "polymarket":
@@ -746,25 +746,80 @@ class BacktestEngine:
         if not trade_files:
             raise ValueError(f"No parquet files found for platform: {platform}")
         
-        # For now, just query the first file with minimal processing
-        trade_file = trade_files[0]
         con = duckdb.connect()
+        all_trades = []
         
-        query = f"""
-            SELECT {self.selected_columns}
-            FROM read_parquet('{trade_file}')
-            LIMIT {limit}
-        """
+        # Load files one by one until we have enough trades for pagination
+        for trade_file in trade_files:
+            # Build WHERE clause with filters
+            where_clause = "WHERE 1=1"
+            
+            if self.timestamp_start:
+                where_clause += f" AND timestamp >= '{self.timestamp_start}'"
+            if self.timestamp_end:
+                where_clause += f" AND timestamp <= '{self.timestamp_end}'"
+            if self.market_id is not None:
+                market_ids = ",".join(f"'{m}'" for m in self.market_id)
+                where_clause += f" AND market_id IN ({market_ids})"
+            if self.market_title is not None:
+                titles = ",".join(f"'{m}'" for m in self.market_title)
+                where_clause += f" AND title IN ({titles})"
+            if self.market_category is not None:
+                categories = ",".join(f"'{c}'" for c in self.market_category)
+                where_clause += f" AND category IN ({categories})"
+            if self.volume_inf is not None:
+                where_clause += f" AND volume >= {self.volume_inf}"
+            if self.volume_sup is not None:
+                where_clause += f" AND volume <= {self.volume_sup}"
+            if self.price_inf is not None:
+                where_clause += f" AND price >= {self.price_inf}"
+            if self.price_sup is not None:
+                where_clause += f" AND price <= {self.price_sup}"
+            if self.amount_inf is not None:
+                where_clause += f" AND amount >= {self.amount_inf}"
+            if self.amount_sup is not None:
+                where_clause += f" AND amount <= {self.amount_sup}"
+            
+            if self.position is not None:
+                positions = " OR ".join(f"position = '{pos}'" for pos in self.position)
+                where_clause += f" AND ({positions})"
+            if self.possible_outcomes is not None:
+                outcomes = " OR ".join(f"list_contains(possible_outcomes, '{outcome}')" for outcome in self.possible_outcomes)
+                where_clause += f" AND ({outcomes})"
+            if self.wallet_maker is not None:
+                wallets = " OR ".join(f"wallet_maker = '{w}'" for w in self.wallet_maker)
+                where_clause += f" AND ({wallets})"
+            if self.wallet_taker is not None:
+                wallets = " OR ".join(f"wallet_taker = '{w}'" for w in self.wallet_taker)
+                where_clause += f" AND ({wallets})"
+            
+            query = f"""
+                SELECT {self.selected_columns}
+                FROM read_parquet('{trade_file}')
+                {where_clause}
+                ORDER BY timestamp
+            """
+            
+            # Fetch rows as native Python types (not numpy)
+            cursor = con.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            
+            # Convert to list of dicts with native Python types (no numpy)
+            file_trades = [dict(zip(columns, row)) for row in rows]
+            all_trades.extend(file_trades)
+            
+            # Early stop: if we have enough for all requested pages, break
+            if len(all_trades) >= limit * page:
+                break
         
-        cursor = con.execute(query)
-        rows = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        
-        # Convert to list of dicts with native Python types
-        trades_list = [dict(zip(columns, row)) for row in rows]
+        # Return only the requested page (manual slicing)
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        page_trades = all_trades[start_idx:end_idx]
         
         return {
-            "trades": trades_list,
+            "trades": page_trades,
             "platform": platform
         }
     
