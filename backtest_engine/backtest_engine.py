@@ -743,15 +743,18 @@ class BacktestEngine:
         # Get list of files, filtering out macOS metadata files (._*)
         trade_files = [f for f in glob(pattern) if not f.split('/')[-1].startswith("._")]
         
+        if not trade_files:
+            raise ValueError(f"No parquet files found for platform: {platform}")
+        
         con = duckdb.connect()
         
-        # Format file list as SQL string array for DuckDB
-        file_list_str = str(trade_files)
+        # Format files as proper SQL array (each path is a string)
+        files_sql = "[" + ", ".join(f"'{f}'" for f in trade_files) + "]"
         
         # Build query using file list - DuckDB fetches only needed rows
         query = f"""
             SELECT {self.selected_columns}
-            FROM read_parquet({file_list_str}, union_by_name=True)
+            FROM read_parquet({files_sql}, union_by_name=True)
             WHERE 1=1
         """
         
