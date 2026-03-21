@@ -730,7 +730,7 @@ class BacktestEngine:
         }))
 
     def showcase_trades(self, page: int = 1, limit: int = 100, platform: str = "polymarket"):
-        """Fetch paginated trades using DuckDB wildcard query (memory efficient)"""
+        """Fetch paginated trades - load files incrementally until we have enough"""
         
         # Validate platform and get file list (excluding macOS metadata files)
         if platform == "polymarket":
@@ -747,67 +747,74 @@ class BacktestEngine:
             raise ValueError(f"No parquet files found for platform: {platform}")
         
         con = duckdb.connect()
+        all_trades = []
         
-        # Format files as proper SQL array (each path is a string)
-        files_sql = "[" + ", ".join(f"'{f}'" for f in trade_files) + "]"
+        # Load files one by one until we have enough trades
+        for trade_file in trade_files:
+            query = f"""
+                SELECT {self.selected_columns}
+                FROM read_parquet('{trade_file}')
+                WHERE 1=1
+            """
+            
+            # Apply filters
+            if self.timestamp_start:
+                query += f" AND timestamp >= '{self.timestamp_start}'"
+            if self.timestamp_end:
+                query += f" AND timestamp <= '{self.timestamp_end}'"
+            if self.market_id is not None:
+                query += f" AND market_id IN {tuple(self.market_id)}"
+            if self.market_title is not None:
+                query += f" AND title IN {tuple(self.market_title)}"
+            if self.market_category is not None:
+                query += f" AND category IN {tuple(self.market_category)}"
+            if self.volume_inf is not None:
+                query += f" AND volume >= {self.volume_inf}"
+            if self.volume_sup is not None:
+                query += f" AND volume <= {self.volume_sup}"
+            if self.price_inf is not None:
+                query += f" AND price >= {self.price_inf}"
+            if self.price_sup is not None:
+                query += f" AND price <= {self.price_sup}"
+            if self.amount_inf is not None:
+                query += f" AND amount >= {self.amount_inf}"
+            if self.amount_sup is not None:
+                query += f" AND amount <= {self.amount_sup}"
+            
+            if self.position is not None:
+                conditions = " OR ".join(f"position = '{pos}'" for pos in self.position)
+                query += f" AND ({conditions})"
+            if self.possible_outcomes is not None:
+                conditions = " OR ".join(f"list_contains(possible_outcomes, '{outcome}')" for outcome in self.possible_outcomes)
+                query += f" AND ({conditions})"
+            if self.wallet_maker is not None:
+                conditions = " OR ".join(f"wallet_maker = '{wallet}'" for wallet in self.wallet_maker)
+                query += f" AND ({conditions})"
+            if self.wallet_taker is not None:
+                conditions = " OR ".join(f"wallet_taker = '{wallet}'" for wallet in self.wallet_taker)
+                query += f" AND ({conditions})"
+            
+            query += " ORDER BY timestamp"
+            
+            # Fetch rows as native Python types (not numpy)
+            cursor = con.execute(query)
+            rows = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            
+            # Convert to list of dicts
+            trades = [dict(zip(columns, row)) for row in rows]
+            all_trades.extend(trades)
+            
+            # Stop early if we have enough for all requested pages
+            if len(all_trades) >= limit * page:
+                break
         
-        # Build query using file list - DuckDB fetches only needed rows
-        query = f"""
-            SELECT {self.selected_columns}
-            FROM read_parquet({files_sql}, union_by_name=True)
-            WHERE 1=1
-        """
-        
-        # Apply all filters
-        if self.timestamp_start:
-            query += f" AND timestamp >= '{self.timestamp_start}'"
-        if self.timestamp_end:
-            query += f" AND timestamp <= '{self.timestamp_end}'"
-        if self.market_id is not None:
-            query += f" AND market_id IN {tuple(self.market_id)}"
-        if self.market_title is not None:
-            query += f" AND title IN {tuple(self.market_title)}"
-        if self.market_category is not None:
-            query += f" AND category IN {tuple(self.market_category)}"
-        if self.volume_inf is not None:
-            query += f" AND volume >= {self.volume_inf}"
-        if self.volume_sup is not None:
-            query += f" AND volume <= {self.volume_sup}"
-        if self.price_inf is not None:
-            query += f" AND price >= {self.price_inf}"
-        if self.price_sup is not None:
-            query += f" AND price <= {self.price_sup}"
-        if self.amount_inf is not None:
-            query += f" AND amount >= {self.amount_inf}"
-        if self.amount_sup is not None:
-            query += f" AND amount <= {self.amount_sup}"
-        
-        if self.position is not None:
-            conditions = " OR ".join(f"position = '{pos}'" for pos in self.position)
-            query += f" AND ({conditions})"
-        if self.possible_outcomes is not None:
-            conditions = " OR ".join(f"list_contains(possible_outcomes, '{outcome}')" for outcome in self.possible_outcomes)
-            query += f" AND ({conditions})"
-        if self.wallet_maker is not None:
-            conditions = " OR ".join(f"wallet_maker = '{wallet}'" for wallet in self.wallet_maker)
-            query += f" AND ({conditions})"
-        if self.wallet_taker is not None:
-            conditions = " OR ".join(f"wallet_taker = '{wallet}'" for wallet in self.wallet_taker)
-            query += f" AND ({conditions})"
-        
-        # Add ORDER BY, LIMIT, OFFSET for pagination (memory efficient)
-        query += f" ORDER BY timestamp LIMIT {limit} OFFSET {(page-1)*limit}"
-        
-        # Execute query and fetch only needed rows (not all rows into dataframe)
-        cursor = con.execute(query)
-        rows = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description]
-        
-        # Convert rows to list of dicts with native Python types (not numpy)
-        trades_list = [dict(zip(columns, row)) for row in rows]
+        # Return only the requested page
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
         
         return {
-            "trades": trades_list,
+            "trades": all_trades[start_idx:end_idx],
             "platform": platform
         }
     
