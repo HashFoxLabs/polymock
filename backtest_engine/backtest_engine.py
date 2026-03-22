@@ -331,6 +331,7 @@ class BacktestEngine:
         self.polymarket_trades_df = con.execute(query).df()
 
     def load_trades_polymarket_streaming(self, on_progress=None):
+        import gc
         
         trade_files = [f for f in glob(f"{DATA_PATH}/polymarket/standardized_trades/*.parquet") 
                     if not f.split('/')[-1].startswith("._")]
@@ -385,6 +386,10 @@ class BacktestEngine:
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True).dt.tz_convert(None)
             dfs.append(df)
             
+            # Force garbage collection every 50 files to free memory
+            if file_idx % 50 == 0:
+                gc.collect()
+            
             # Report progress per file loaded
             if on_progress:
                 progress_pct = int((file_idx / total_files) * 100)
@@ -393,12 +398,18 @@ class BacktestEngine:
         print(f"Finished loading all trade files. Total trades loaded: {sum(len(df) for df in dfs)}")
         
         # Efficiently merge pre-sorted dataframes using mergesort (O(n log k) for nearly-sorted data)
-        self.polymarket_trades_df = pd.concat(dfs, ignore_index=True).sort_values(
-            "timestamp", kind="mergesort"
-        ).reset_index(drop=True)
+        # Concatenate in chunks to reduce peak memory usage
+        if len(dfs) > 0:
+            self.polymarket_trades_df = pd.concat(dfs, ignore_index=True).sort_values(
+                "timestamp", kind="mergesort"
+            ).reset_index(drop=True)
+            # Free the list of dataframes
+            dfs.clear()
+            gc.collect()
         
         # Final sanity check
         print(f"Final combined trades sorted: {self.polymarket_trades_df['timestamp'].is_monotonic_increasing}")
+
 
 # =======================================================================================================================================
 
