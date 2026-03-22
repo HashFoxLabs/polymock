@@ -181,10 +181,10 @@ class BacktestEngine:
             
         Example:
             Input (Part 2):  "direction = 'buy' if price <= 0.01 else 'hold'"
-            Output:          def mean_reversion(...): direction = 'buy' if price <= 0.01 else 'hold'
+            Output:          def strategy_function(...): direction = 'buy' if price <= 0.01 else 'hold'
         """
         # Part 1: Function signature (fixed)
-        part1 = "def mean_reversion(trade, trade_log, portfolio, user_perso_parameters):"
+        part1 = "def strategy_function(trade, trade_log, portfolio, user_perso_parameters):"
         
         # Part 2: User logic - normalize indentation
         lines = user_code_part2.strip().split('\n')
