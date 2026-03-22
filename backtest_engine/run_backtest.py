@@ -10,16 +10,16 @@ from datetime import datetime
 filters = {
     "initial_cash": 10000,
     "platform": ["polymarket"],
-    "timestamp_start": datetime(2025, 1, 25),
-    "timestamp_end": datetime(2025, 1, 26),
+    "timestamp_start": None,
+    "timestamp_end": None,
     "market_id": None,              # all markets
-    "market_title": None,
+    "market_title": ['Will the Jets make the first pick of the 2025 NFL Draft?'],
     "volume_inf": None,             # only markets with meaningful volume
     "volume_sup": None,
     "position": None,
     "price_inf": None,
     "price_sup": 0.1,
-    "amount_inf": 10000000,
+    "amount_inf": None,
     "amount_sup": None,
 }
 
