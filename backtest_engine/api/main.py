@@ -31,7 +31,7 @@ class BacktestRequest(BaseModel):
     """Request model for backtest endpoint - supports all BacktestEngine parameters"""
     
     # Strategy and portfolio
-    strategy_code: str = Field(..., description="Python strategy function code", min_length=1, max_length=10000)
+    strategy_code: str = Field(..., description="Strategy function body (Part 2 only) - custom logic between function signature and return statement", min_length=1, max_length=10000)
     initial_cash: float = Field(10000, gt=0, description="Initial portfolio cash")
     strat_var: Optional[List[bool]] = Field(
         None,
@@ -96,11 +96,14 @@ class BacktestRequest(BaseModel):
     
     @validator('strategy_code')
     def validate_strategy_code(cls, v):
-        """Pre-validate strategy code syntax"""
+        """Pre-validate strategy code (Part 2) syntax"""
+        if not v.strip():
+            raise ValueError("Strategy code cannot be empty")
         try:
-            RestrictedStrategyExecutor.compile_strategy(v)
+            # Validate Part 2 code is syntactically valid Python
+            compile(v, "<string>", "exec")
         except SyntaxError as e:
-            raise ValueError(f"Invalid strategy code: {str(e)[:200]}")
+            raise ValueError(f"Invalid Python syntax in strategy code: {str(e)[:200]}")
         return v
 
 class BacktestResponse(BaseModel):
@@ -268,10 +271,21 @@ async def run_backtest(request: Request, backtest_request: BacktestRequest):
             wallet_taker=backtest_request.wallet_taker,
         )
         
+        # Assemble full strategy code (Parts 1+2+3) from user-provided Part 2
+        full_strategy_code = BacktestEngine.assemble_strategy_code(
+            backtest_request.strategy_code
+        )
+        
+        # Validate assembled code can be compiled
+        try:
+            RestrictedStrategyExecutor.compile_strategy(full_strategy_code)
+        except SyntaxError as e:
+            raise ValueError(f"Strategy compilation failed: {str(e)[:200]}")
+        
         # Run backtest in thread pool (avoid blocking event loop)
         metrics = await asyncio.to_thread(
             engine.run_with_user_code,
-            backtest_request.strategy_code
+            full_strategy_code
         )
         
         execution_time = (datetime.now() - start_time).total_seconds()

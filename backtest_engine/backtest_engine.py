@@ -166,6 +166,55 @@ class BacktestEngine:
         self.settle_log = []
         self.portfolio = {"cash": initial_cash, "positions": {}}
 
+    @staticmethod
+    def assemble_strategy_code(user_code_part2: str) -> str:
+        """
+        Assemble complete strategy function from user-provided Part 2 (body only).
+        
+        Wraps the user's custom logic with the fixed Part 1 (function signature) and Part 3 (return statement).
+        
+        Args:
+            user_code_part2: Strategy logic provided by user (non-indented or with relative indentation)
+        
+        Returns:
+            Full strategy function code ready for execution
+            
+        Example:
+            Input (Part 2):  "direction = 'buy' if price <= 0.01 else 'hold'"
+            Output:          def mean_reversion(...): direction = 'buy' if price <= 0.01 else 'hold'
+        """
+        # Part 1: Function signature (fixed)
+        part1 = "def mean_reversion(trade, trade_log, portfolio, user_perso_parameters):"
+        
+        # Part 2: User logic - normalize indentation
+        lines = user_code_part2.strip().split('\n')
+        
+        # Find minimum indentation (excluding blank lines)
+        min_indent = float('inf')
+        for line in lines:
+            if line.strip():  # Non-empty line
+                indent = len(line) - len(line.lstrip())
+                min_indent = min(min_indent, indent)
+        
+        if min_indent == float('inf'):
+            min_indent = 0  # All lines are blank
+        
+        # Remove common indentation, then add 4-space function body indentation
+        indented_lines = []
+        for line in lines:
+            if line.strip():  # Non-empty line
+                # Remove the common minimum indentation
+                stripped = line[min_indent:] if min_indent > 0 else line
+                # Add 4-space function body indentation
+                indented_lines.append('    ' + stripped)
+            else:
+                indented_lines.append('')  # Preserve blank lines
+        
+        # Join all parts
+        full_code = part1 + '\n' + '\n'.join(indented_lines)
+        
+        return full_code
+
 # =======================================================================================================================================
 
     def load_trades(self):
