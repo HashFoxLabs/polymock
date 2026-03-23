@@ -5,11 +5,36 @@
 //!   - trade_log: list of all past trades executed by the strategy
 //!   - portfolio: current state of the portfolio
 //!   - user_perso_parameters: JSON value for custom persistent parameters
+//!     Customizable keys (set via frontend/terminal):
+//!       "threshold_low": f64 — buy when price <= this (default 0.01)
+//!       "amount": i64 — fixed amount per trade (default 10)
+//!       "cooldown_days": i64 — for time-based strategy (default 1)
 //!
 //! output:
 //!   Action { market_id, position, amount, user_perso_parameters }
 
 use crate::engine::{Action, Trade, TradeLogEntry, Portfolio};
+
+/// Read threshold_low from user params, fallback to default.
+fn get_threshold(params: &serde_json::Value, default: f64) -> f64 {
+    params.get("threshold_low")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(default)
+}
+
+/// Read fixed amount from user params, fallback to default.
+fn get_amount(params: &serde_json::Value, default: i64) -> i64 {
+    params.get("amount")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(default)
+}
+
+/// Read cooldown days from user params, fallback to default.
+fn get_cooldown_days(params: &serde_json::Value, default: i64) -> i64 {
+    params.get("cooldown_days")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(default)
+}
 
 fn hold_action(market_id: &str) -> Action {
     Action {
@@ -28,10 +53,10 @@ pub fn mean_reversion(
     trade: &Trade,
     _trade_log: &[TradeLogEntry],
     _portfolio: &Portfolio,
-    _user_perso_parameters: &serde_json::Value,
+    user_perso_parameters: &serde_json::Value,
 ) -> Action {
-    let threshold_low = 0.01;
-    let amount = 10;
+    let threshold_low = get_threshold(user_perso_parameters, 0.01);
+    let amount = get_amount(user_perso_parameters, 10);
     let market_id = trade.market_id.as_deref().unwrap_or("");
 
     if trade.price.unwrap_or(f64::MAX) <= threshold_low {
@@ -54,9 +79,9 @@ pub fn mean_reversion_with_portfolio_cash(
     trade: &Trade,
     _trade_log: &[TradeLogEntry],
     portfolio: &Portfolio,
-    _user_perso_parameters: &serde_json::Value,
+    user_perso_parameters: &serde_json::Value,
 ) -> Action {
-    let threshold_low = 0.01;
+    let threshold_low = get_threshold(user_perso_parameters, 0.01);
     let market_id = trade.market_id.as_deref().unwrap_or("");
 
     if trade.price.unwrap_or(f64::MAX) <= threshold_low {
@@ -80,9 +105,10 @@ pub fn mean_reversion_with_portfolio_positions(
     trade: &Trade,
     _trade_log: &[TradeLogEntry],
     portfolio: &Portfolio,
-    _user_perso_parameters: &serde_json::Value,
+    user_perso_parameters: &serde_json::Value,
 ) -> Action {
-    let threshold_low = 0.01;
+    let threshold_low = get_threshold(user_perso_parameters, 0.01);
+    let amount = get_amount(user_perso_parameters, 10);
     let market_id = trade.market_id.as_deref().unwrap_or("");
     let position = trade.position.as_deref().unwrap_or("hold");
 
@@ -94,7 +120,7 @@ pub fn mean_reversion_with_portfolio_positions(
             Action {
                 market_id: market_id.to_string(),
                 position: position.to_string(),
-                amount: 10,
+                amount,
                 user_perso_parameters: None,
             }
         }
@@ -111,9 +137,10 @@ pub fn mean_reversion_with_trade_log(
     trade: &Trade,
     trade_log: &[TradeLogEntry],
     _portfolio: &Portfolio,
-    _user_perso_parameters: &serde_json::Value,
+    user_perso_parameters: &serde_json::Value,
 ) -> Action {
-    let threshold_low = 0.01;
+    let threshold_low = get_threshold(user_perso_parameters, 0.01);
+    let amount = get_amount(user_perso_parameters, 10);
     let market_id = trade.market_id.as_deref().unwrap_or("");
     let position = trade.position.as_deref().unwrap_or("hold");
     let price = trade.price.unwrap_or(f64::MAX);
@@ -134,7 +161,7 @@ pub fn mean_reversion_with_trade_log(
                 Action {
                     market_id: market_id.to_string(),
                     position: position.to_string(),
-                    amount: 10,
+                    amount,
                     user_perso_parameters: None,
                 }
             } else {
@@ -144,7 +171,7 @@ pub fn mean_reversion_with_trade_log(
             Action {
                 market_id: market_id.to_string(),
                 position: position.to_string(),
-                amount: 10,
+                amount,
                 user_perso_parameters: None,
             }
         }
@@ -163,7 +190,9 @@ pub fn mean_reversion_with_trade_log_time(
     _portfolio: &Portfolio,
     user_perso_parameters: &serde_json::Value,
 ) -> Action {
-    let threshold_low = 0.01;
+    let threshold_low = get_threshold(user_perso_parameters, 0.01);
+    let amount = get_amount(user_perso_parameters, 10);
+    let cooldown_days = get_cooldown_days(user_perso_parameters, 1);
     let market_id = trade.market_id.as_deref().unwrap_or("");
     let position = trade.position.as_deref().unwrap_or("hold");
     let price = trade.price.unwrap_or(f64::MAX);
@@ -182,11 +211,11 @@ pub fn mean_reversion_with_trade_log_time(
 
             if let (Some(latest), Some(current)) = (latest_trade_time, trade.timestamp) {
                 let diff = current.signed_duration_since(latest);
-                if diff.num_days() > 1 {
+                if diff.num_days() > cooldown_days {
                     Action {
                         market_id: market_id.to_string(),
                         position: position.to_string(),
-                        amount: 10,
+                        amount,
                         user_perso_parameters: Some(user_perso_parameters.clone()),
                     }
                 } else {
@@ -201,7 +230,7 @@ pub fn mean_reversion_with_trade_log_time(
                 Action {
                     market_id: market_id.to_string(),
                     position: position.to_string(),
-                    amount: 10,
+                    amount,
                     user_perso_parameters: Some(user_perso_parameters.clone()),
                 }
             }
@@ -209,7 +238,7 @@ pub fn mean_reversion_with_trade_log_time(
             Action {
                 market_id: market_id.to_string(),
                 position: position.to_string(),
-                amount: 10,
+                amount,
                 user_perso_parameters: Some(user_perso_parameters.clone()),
             }
         }
@@ -233,7 +262,7 @@ pub fn mean_reversion_with_user_perso_parameter_internal(
     _portfolio: &Portfolio,
     user_perso_parameters: &serde_json::Value,
 ) -> Action {
-    let threshold_low = 0.01;
+    let threshold_low = get_threshold(user_perso_parameters, 0.01);
     let market_id = trade.market_id.as_deref().unwrap_or("");
     let position = trade.position.as_deref().unwrap_or("hold");
 

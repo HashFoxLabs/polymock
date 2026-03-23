@@ -22,7 +22,7 @@ use polars::prelude::*;
 use serde::{Deserialize, Serialize};
 
 const SYNTHESIS_API_BASE: &str = "https://synthesis.trade/api/v1";
-const TRADES_PER_REQUEST: u32 = 1000;
+const TRADES_PER_REQUEST: u32 = 10000;
 
 // ── API response types ─────────────────────────────────────────────────────────
 
@@ -80,7 +80,7 @@ struct MarketInfo {
 }
 
 #[derive(Debug, Deserialize)]
-struct SynthesisTrade {
+pub struct SynthesisTrade {
     tx_hash: Option<String>,
     token_id: Option<String>,
     address: Option<String>,

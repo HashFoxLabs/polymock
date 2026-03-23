@@ -35,7 +35,7 @@ struct Args {
     candles_dir: Option<PathBuf>,
 
     /// Max trades per market
-    #[arg(long, default_value_t = 10000)]
+    #[arg(long, default_value_t = 50000)]
     max_trades: usize,
 
     /// Also fetch OHLC candlestick data

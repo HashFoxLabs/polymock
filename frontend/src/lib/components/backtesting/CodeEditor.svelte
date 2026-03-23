@@ -32,12 +32,7 @@
 		filterVolumeSup: number | null;
 		selectedMarkets?: any[];
 		onEditConfig: () => void;
-		onRunBacktest: (strategyCode: string, strategyType: string | null, strategyParams?: {
-			initialCash: number;
-			reimburseOpenPositions: boolean;
-			priceInf: number | null;
-			priceSup: number | null;
-		}) => void | Promise<void>;
+		onRunBacktest: (strategyCode: string, strategyType: string | null, strategyParams?: Record<string, unknown>) => void | Promise<void>;
 	} = $props();
 
 	// Strategy execution params (configurable via terminal)
@@ -45,6 +40,16 @@
 	let reimburseOpenPositions = $state(false);
 	let priceInf: number | null = $state(null);
 	let priceSup: number | null = $state(null);
+
+	// Strategy-specific params
+	let thresholdLow = $state(0.30);
+	let amount = $state(10);
+
+	// Exit rules
+	let stopLoss: number | null = $state(null);      // e.g. 0.20 = 20%
+	let takeProfit: number | null = $state(null);     // e.g. 0.50 = 50%
+	let trailingStop: number | null = $state(null);   // e.g. 0.10 = 10%
+	let maxHoldHours: number | null = $state(null);   // e.g. 168 = 7 days
 
 	/** Parse a number that may use comma as decimal separator */
 	function parseNum(s: string): number {
@@ -235,6 +240,14 @@
 		term.writeln(`  ${G}cash${R}         $${initialCash.toLocaleString()}        ${DIM}set cash <amount>${R}`);
 		term.writeln(`  ${G}reimburse${R}    ${reimburseOpenPositions ? 'on' : 'off'}                 ${DIM}set reimburse on/off${R}`);
 		term.writeln(`  ${G}price${R}        ${priceInf ?? '0'} → ${priceSup ?? '1'}            ${DIM}set price <min> <max>${R}`);
+		term.writeln(`${O}━━━ Strategy Params ━━━${R}`);
+		term.writeln(`  ${G}threshold${R}    ${thresholdLow}              ${DIM}set threshold <value>${R}`);
+		term.writeln(`  ${G}amount${R}       ${amount}                 ${DIM}set amount <shares>${R}`);
+		term.writeln(`${O}━━━ Exit Rules ━━━${R}`);
+		term.writeln(`  ${G}stoploss${R}     ${stopLoss != null ? (stopLoss * 100).toFixed(0) + '%' : 'off'}              ${DIM}set stoploss <% or off>${R}`);
+		term.writeln(`  ${G}takeprofit${R}   ${takeProfit != null ? (takeProfit * 100).toFixed(0) + '%' : 'off'}              ${DIM}set takeprofit <% or off>${R}`);
+		term.writeln(`  ${G}trailing${R}     ${trailingStop != null ? (trailingStop * 100).toFixed(0) + '%' : 'off'}              ${DIM}set trailing <% or off>${R}`);
+		term.writeln(`  ${G}maxhold${R}      ${maxHoldHours != null ? maxHoldHours + 'h' : 'off'}              ${DIM}set maxhold <hours or off>${R}`);
 		term.writeln(`${O}━━━━━━━━━━━━━━━━━━━${R}`);
 	}
 

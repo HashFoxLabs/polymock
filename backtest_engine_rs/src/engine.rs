@@ -59,6 +59,12 @@ pub struct SettleLogEntry {
     pub outcome: Option<String>,
     pub refund: Option<f64>,
     pub timestamp: Option<NaiveDateTime>,
+    /// Exit reason: "RESOLUTION", "STOP_LOSS", "TAKE_PROFIT", "TRAILING_STOP", "MAX_HOLD_TIME", "REIMBURSED"
+    #[serde(default)]
+    pub exit_reason: Option<String>,
+    /// Price at which the position was exited (for SL/TP/trailing)
+    #[serde(default)]
+    pub exit_price: Option<f64>,
 }
 
 /// Portfolio state.
@@ -106,6 +112,12 @@ pub struct BacktestEngine {
     pub initial_cash: f64,
     pub reimburse_open_positions: bool,
 
+    // Exit rules
+    pub stop_loss: Option<f64>,       // close if price drops this % from entry (e.g. 0.20 = 20%)
+    pub take_profit: Option<f64>,     // close if price rises this % from entry (e.g. 0.50 = 50%)
+    pub trailing_stop: Option<f64>,   // close if price drops this % from peak (e.g. 0.10 = 10%)
+    pub max_hold_hours: Option<f64>,  // close after this many hours
+
     // Filters
     pub platform: Option<Vec<String>>,
     pub timestamp_start: Option<NaiveDateTime>,
@@ -136,6 +148,12 @@ pub struct BacktestEngine {
     pub settle_log: Vec<SettleLogEntry>,
     pub portfolio: Portfolio,
     last_known_price: HashMap<(String, String), f64>,
+    /// Weighted average entry price per position (market_id, position) → avg_price
+    entry_prices: HashMap<(String, String), f64>,
+    /// Highest price seen since entry per position (for trailing stop)
+    peak_prices: HashMap<(String, String), f64>,
+    /// Entry timestamp per position (for max_hold_hours)
+    entry_times: HashMap<(String, String), NaiveDateTime>,
 }
 
 impl BacktestEngine {
@@ -164,6 +182,10 @@ impl BacktestEngine {
         Self {
             initial_cash,
             reimburse_open_positions,
+            stop_loss: None,
+            take_profit: None,
+            trailing_stop: None,
+            max_hold_hours: None,
             platform,
             timestamp_start,
             timestamp_end,
@@ -193,6 +215,9 @@ impl BacktestEngine {
                 positions: HashMap::new(),
             },
             last_known_price: HashMap::new(),
+            entry_prices: HashMap::new(),
+            peak_prices: HashMap::new(),
+            entry_times: HashMap::new(),
         }
     }
 
@@ -446,8 +471,9 @@ impl BacktestEngine {
                     "No".to_string()
                 };
                 // Parse close_time
+                let far_future = NaiveDateTime::parse_from_str("2099-12-31 23:59:59", "%Y-%m-%d %H:%M:%S").unwrap();
                 let close_time = Self::extract_naive_datetime(close_col, i)
-                    .unwrap_or_else(|| NaiveDateTime::default());
+                    .unwrap_or(far_future);
                 map.insert(ticker.to_string(), (Some(outcome), close_time));
             }
         }
@@ -482,8 +508,10 @@ impl BacktestEngine {
                 (slug_col.get(i), outcomes_col.get(i), prices_col.get(i))
             {
                 let final_outcome = Self::get_final_outcome(outcomes_str, prices_str);
+                // Default to far future so unresolved markets are never settled by timestamp alone
+                let far_future = NaiveDateTime::parse_from_str("2099-12-31 23:59:59", "%Y-%m-%d %H:%M:%S").unwrap();
                 let end_date = Self::extract_naive_datetime(end_col, i)
-                    .unwrap_or_else(|| NaiveDateTime::default());
+                    .unwrap_or(far_future);
                 map.insert(slug.to_string(), (final_outcome, end_date));
             }
         }
@@ -555,7 +583,9 @@ impl BacktestEngine {
 
         for (market_id, position) in self.portfolio.positions.keys() {
             if let Some((outcome, end_date)) = self.market_outcomes.get(market_id) {
-                if current_timestamp >= *end_date {
+                // Only settle if the market has actually resolved (outcome is known)
+                // AND the current timestamp is past the end date
+                if outcome.is_some() && current_timestamp >= *end_date {
                     to_settle.push((market_id.clone(), position.clone(), outcome.clone()));
                 }
             }
@@ -564,20 +594,26 @@ impl BacktestEngine {
         for (market_id, position, outcome) in to_settle {
             let key = (market_id.clone(), position.clone());
             if let Some(&amount) = self.portfolio.positions.get(&key) {
-                if outcome.as_ref() == Some(&position) {
+                let won = outcome.as_ref() == Some(&position);
+                if won {
                     // Winning side: payout = amount * 1.00
                     self.portfolio.cash += amount as f64 * 1.00;
-                    self.settle_log.push(SettleLogEntry {
-                        market_id: market_id.clone(),
-                        position: position.clone(),
-                        amount,
-                        outcome: outcome.clone(),
-                        refund: None,
-                        timestamp: Some(current_timestamp),
-                    });
                 }
-                // Losing side: payout = 0, just remove
+                // Log settlement for both winning and losing sides
+                self.settle_log.push(SettleLogEntry {
+                    market_id: market_id.clone(),
+                    position: position.clone(),
+                    amount,
+                    outcome: outcome.clone(),
+                    refund: None,
+                    timestamp: Some(current_timestamp),
+                    exit_reason: Some("RESOLUTION".to_string()),
+                    exit_price: Some(if won { 1.0 } else { 0.0 }),
+                });
                 self.portfolio.positions.remove(&key);
+                self.entry_prices.remove(&key);
+                self.peak_prices.remove(&key);
+                self.entry_times.remove(&key);
             }
         }
     }
@@ -636,6 +672,105 @@ impl BacktestEngine {
         }
     }
 
+    // ── Check exit rules (SL / TP / Trailing / Max Hold) ──────────────────
+
+    fn check_exit_rules(&mut self, current_timestamp: NaiveDateTime) {
+        let has_any = self.stop_loss.is_some()
+            || self.take_profit.is_some()
+            || self.trailing_stop.is_some()
+            || self.max_hold_hours.is_some();
+        if !has_any {
+            return;
+        }
+
+        let mut to_exit: Vec<(String, String, f64, String)> = Vec::new(); // (market_id, position, exit_price, reason)
+
+        for ((market_id, position), &amount) in &self.portfolio.positions {
+            let current_price = match self.last_known_price.get(&(market_id.clone(), position.clone())) {
+                Some(&p) => p,
+                None => continue,
+            };
+            let entry_price = match self.entry_prices.get(&(market_id.clone(), position.clone())) {
+                Some(&p) => p,
+                None => continue,
+            };
+
+            // Update peak price for trailing stop
+            let peak = self.peak_prices
+                .entry((market_id.clone(), position.clone()))
+                .or_insert(entry_price);
+            if current_price > *peak {
+                *peak = current_price;
+            }
+            let peak_price = *peak;
+
+            // Stop Loss: price dropped SL% from entry
+            if let Some(sl_pct) = self.stop_loss {
+                let sl_price = entry_price * (1.0 - sl_pct);
+                if current_price <= sl_price {
+                    to_exit.push((market_id.clone(), position.clone(), current_price, "STOP_LOSS".to_string()));
+                    continue;
+                }
+            }
+
+            // Take Profit: price rose TP% from entry
+            if let Some(tp_pct) = self.take_profit {
+                let tp_price = entry_price * (1.0 + tp_pct);
+                if current_price >= tp_price {
+                    to_exit.push((market_id.clone(), position.clone(), current_price, "TAKE_PROFIT".to_string()));
+                    continue;
+                }
+            }
+
+            // Trailing Stop: price dropped trailing% from peak
+            if let Some(trail_pct) = self.trailing_stop {
+                let trail_price = peak_price * (1.0 - trail_pct);
+                if current_price <= trail_price && peak_price > entry_price {
+                    to_exit.push((market_id.clone(), position.clone(), current_price, "TRAILING_STOP".to_string()));
+                    continue;
+                }
+            }
+
+            // Max Hold Time: position held too long
+            if let Some(max_hours) = self.max_hold_hours {
+                if let Some(entry_time) = self.entry_times.get(&(market_id.clone(), position.clone())) {
+                    let hours_held = current_timestamp.signed_duration_since(*entry_time).num_hours() as f64;
+                    if hours_held >= max_hours {
+                        to_exit.push((market_id.clone(), position.clone(), current_price, "MAX_HOLD_TIME".to_string()));
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // Execute exits
+        for (market_id, position, exit_price, reason) in to_exit {
+            let key = (market_id.clone(), position.clone());
+            if let Some(&amount) = self.portfolio.positions.get(&key) {
+                let payout = (amount as f64 * exit_price * 1e6).round() / 1e6;
+                self.portfolio.cash += payout;
+                println!(
+                    "[EXIT:{}] market={} pos={} amount={} exit_price={:.4} payout={:.2} cash_after={:.2}",
+                    reason, market_id, position, amount, exit_price, payout, self.portfolio.cash
+                );
+                self.settle_log.push(SettleLogEntry {
+                    market_id: market_id.clone(),
+                    position: position.clone(),
+                    amount,
+                    outcome: None,
+                    refund: Some(payout),
+                    timestamp: Some(current_timestamp),
+                    exit_reason: Some(reason),
+                    exit_price: Some(exit_price),
+                });
+                self.portfolio.positions.remove(&key);
+                self.entry_prices.remove(&key);
+                self.peak_prices.remove(&key);
+                self.entry_times.remove(&key);
+            }
+        }
+    }
+
     // ── Reimburse open positions ───────────────────────────────────────────
 
     fn reimburse_open(&mut self) {
@@ -653,6 +788,8 @@ impl BacktestEngine {
                         outcome: None,
                         refund: Some(refund),
                         timestamp: None,
+                        exit_reason: Some("REIMBURSED".to_string()),
+                        exit_price: Some(last_price),
                     });
                 }
                 Err(e) => {
@@ -660,22 +797,35 @@ impl BacktestEngine {
                 }
             }
             self.portfolio.positions.remove(&key);
+            self.entry_prices.remove(&key);
+            self.peak_prices.remove(&key);
+            self.entry_times.remove(&key);
         }
     }
 
     // ── Run ────────────────────────────────────────────────────────────────
 
-    /// Run the backtest loop with the given strategy function.
+    /// Run the backtest with default (empty) strategy parameters.
     pub fn run(&mut self, strategy_func: StrategyFn) -> Result<Metrics> {
+        self.run_with_params(strategy_func, serde_json::Value::Object(serde_json::Map::new()))
+    }
+
+    /// Run the backtest loop with the given strategy function.
+    /// `strategy_params` are the user-customizable strategy parameters (threshold_low, amount, etc.)
+    /// that get passed as the initial `user_perso_parameters` to every strategy call.
+    pub fn run_with_params(&mut self, strategy_func: StrategyFn, strategy_params: serde_json::Value) -> Result<Metrics> {
         println!("Loading trades...");
         self.load_trades()?;
         println!("Loading market outcomes...");
         self.load_all_outcomes()?;
 
-        let mut user_perso_parameters = serde_json::Value::Object(serde_json::Map::new());
+        let mut user_perso_parameters = strategy_params;
         self.last_known_price.clear();
         self.settle_log.clear();
         self.trade_log.clear();
+        self.entry_prices.clear();
+        self.peak_prices.clear();
+        self.entry_times.clear();
         self.portfolio = Portfolio {
             cash: self.initial_cash,
             positions: HashMap::new(),
@@ -729,6 +879,8 @@ impl BacktestEngine {
             // Settle resolved positions
             if let Some(ts) = trade.timestamp {
                 self.settle_resolved_positions(ts);
+                // Check exit rules (SL/TP/trailing/max hold)
+                self.check_exit_rules(ts);
             }
 
             // Call user strategy
@@ -769,7 +921,26 @@ impl BacktestEngine {
             );
 
             let key = (action.market_id.clone(), action.position.clone());
-            *self.portfolio.positions.entry(key).or_insert(0) += action.amount;
+            let existing_amount = *self.portfolio.positions.get(&key).unwrap_or(&0);
+            let new_amount = existing_amount + action.amount;
+            *self.portfolio.positions.entry(key.clone()).or_insert(0) += action.amount;
+
+            // Update weighted average entry price
+            let old_entry = self.entry_prices.get(&key).copied().unwrap_or(0.0);
+            let new_avg = if new_amount > 0 {
+                (old_entry * existing_amount as f64 + cost) / new_amount as f64
+            } else {
+                price
+            };
+            self.entry_prices.insert(key.clone(), new_avg);
+
+            // Initialize peak price for trailing stop
+            self.peak_prices.entry(key.clone()).or_insert(price);
+
+            // Track entry time (first entry time)
+            if let Some(ts) = trade.timestamp {
+                self.entry_times.entry(key).or_insert(ts);
+            }
 
             // Log the trade
             self.trade_log.push(TradeLogEntry {

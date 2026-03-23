@@ -19,6 +19,10 @@ path = "src/bin/format_data.rs"
 name = "test_synthesis_backtest"
 path = "src/bin/test_synthesis_backtest.rs"
 
+[[bin]]
+name = "backtest_api"
+path = "src/bin/backtest_api.rs"
+
 [dependencies]
 polars = { version = "0.46", features = ["parquet", "lazy", "dtype-datetime", "dtype-struct", "strings", "temporal", "round_series", "is_in", "regex"] }
 reqwest = { version = "0.12", features = ["json", "blocking"] }
