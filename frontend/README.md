@@ -1,114 +1,72 @@
-# PolyMock
+# PolyMock Frontend
 
-A paper trading platform for Polymarket prediction markets, built with SvelteKit.
+SvelteKit web application for paper trading on Polymarket prediction markets.
 
-## Overview
+## Stack
 
-PolyMock is a demo trading platform that allows users to explore and simulate trading on Polymarket prediction markets. It features real-time market data, live news feeds,
+- **SvelteKit 2** + TypeScript + Vite 7
+- **Solana Web3.js** + Anchor SDK for on-chain trading
+- **Supabase** for auth and saved strategies
+- **Web3Auth** for social login
+- **Synthesis Trade API** for market data and historical trades
 
 ## Features
 
-- **Live Polymarket Data**: Fetch and display real prediction markets from Polymarket API
-- **Real-time Price Feeds**: SOL/USD prices from Pyth Network
-- **Crypto News**: Live news feed from CryptoCompare
-- **Paper Trading**: Simulate trading without real money (demo mode)
-- **Competition Mode**: Mock leaderboards and trading activity
-- **Terminal-style UI**: Bloomberg-inspired interface design
+- Real-time Polymarket data (markets, prices, events)
+- Virtual USDC paper trading on Solana
+- Strategy backtesting wizard (proxies to Rust engine on Fly.io)
+- Saved strategies with full backtest history
+- Portfolio dashboard with P&L tracking
+- Competition leaderboards
+- Market browser and news feed
 
-## Data Sources
+## Routes
 
-- **Polymarket API**: Prediction market data (https://docs.polymarket.com/developers/gamma-markets-api/get-markets)
-- **Pyth Network**: Real-time SOL price feeds
-- **CryptoCompare**: Cryptocurrency news and market data
+| Route | Description |
+|-------|-------------|
+| `/` | Main trading terminal |
+| `/backtesting` | Strategy backtesting wizard |
+| `/strategies` | Saved backtest strategies |
+| `/dashboard` | Portfolio & positions |
+| `/competition` | Leaderboards |
+| `/marketplace` | Market browser |
+| `/news` | News feed |
+| `/event/[slug]` | Event detail + trading |
+| `/market/[id]` | Market detail |
+| `/profile` | User profile |
 
-## Tech Stack
+## API Routes
 
-- **Framework**: SvelteKit
-- **Language**: TypeScript
-- **Styling**: Pure CSS (terminal/Bloomberg-inspired design)
-- **API Integration**: Axios for HTTP requests
-- **Price Data**: Pyth Hermes client
+| Route | Description |
+|-------|-------------|
+| `/api/backtest/run` | Proxies to Fly.io Rust backtest engine |
+| `/api/backtest/trades` | Streams trade data from Synthesis |
+| `/api/markets` | Market listing from Synthesis |
+| `/api/strategies` | CRUD for saved strategies (Supabase) |
+| `/api/news`, `/api/newsdata` | News feeds |
+| `/api/auth/*` | Authentication (Google, wallet) |
 
-## Getting Started
+## Setup
 
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
-
-```sh
+```bash
 npm install
+cp ../.env.example .env  # Fill in your keys
+npm run dev              # http://localhost:5173
 ```
 
-### Development
+## Scripts
 
-Start the development server:
+- `npm run dev` — Dev server with HMR
+- `npm run build` — Production build
+- `npm run preview` — Preview production build
+- `npm run check` — Svelte type checking
 
-```sh
-npm run dev
+## Environment Variables
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+See `../.env.example` for the full list. Key ones:
 
-### Building
-
-To create a production version:
-
-```sh
-npm run build
-```
-
-Preview the production build:
-
-```sh
-npm run preview
-```
-
-## Project Structure
-
-```
-src/
-├── lib/
-│   └── polymarket.ts    # Polymarket API client
-├── routes/
-│   ├── +page.svelte     # Main terminal interface
-│   └── competition/     # Competition/leaderboard page
-└── app.html             # HTML template
-```
-
-## API Integration
-
-### Polymarket Markets
-
-The platform fetches live prediction markets from the Polymarket API, displaying:
-- Market questions and descriptions
-- Current prices and trading volume
-- End dates and market categories
-- Tags and market metadata
-
-### Price Feeds
-
-Real-time SOL/USD price data is fetched from Pyth Network's Hermes API, showing:
-- Current spot price
-- Price changes and trends
-- Confidence intervals
-- EMA (Exponential Moving Average) prices
-
-### News Feed
-
-Cryptocurrency news is sourced from CryptoCompare API, featuring:
-- Latest crypto market news
-- Article timestamps and sources
-- Clickable links to full articles
-- Real-time updates
-
-## Demo Mode
-
-This is a demo/paper trading platform. No real trades are executed, and all trading activity is simulated for educational and demonstration purposes.
-
-## Deployment
-
-To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
-
-## License
+- `SYNTHESIS_API_KEY` — Synthesis Trade API key
+- `BACKTEST_ENGINE_URL` — Fly.io backtest server (`https://polymock-backtest.fly.dev`)
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase
+- `VITE_WEB3AUTH_CLIENT_ID` — Web3Auth social login
+- `TWELVE_DATA_API_KEY` — Market price data

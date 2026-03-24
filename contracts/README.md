@@ -1,65 +1,42 @@
-# Polymarket Paper Trading Smart Contract
+# PolyMock Smart Contracts
 
-A Solana smart contract for paper trading Polymarket predictions using Anchor framework.
-
-## Overview
-
-This contract allows users to:
-- Initialize a paper trading account with 10,000 USDC virtual balance
-- Buy YES/NO shares in prediction markets
-- Close positions and realize profits/losses
-- Track trading performance
+Solana smart contracts for paper trading on Polymarket prediction markets. Built with the Anchor framework.
 
 ## Deployment
 
-- **Network**: MagicBlock Devnet
-- **Program ID**: `AmuwGa8LXKW63ZHzGm1TkqSugbJ8fMVXr6HKksYkwUNT`
-- **RPC URL**: `https://rpc.magicblock.app/devnet/`
+- **Network**: Solana (MagicBlock Devnet)
+- **Program ID**: `6a5sw2ZVXkAqPF5F8jSvBFVWZSBenaMGnRjnhPoVD31Z`
+- **RPC**: `https://rpc.magicblock.app/devnet/`
 
-## Quick Start
+## Instructions
 
-### Build
-```bash
-anchor build
-```
+| Instruction | Description |
+|-------------|-------------|
+| `initialize_config` | One-time program setup (treasury, authority) |
+| `initialize_account` | Create user account with 10,000 virtual USDC |
+| `buy_yes` / `buy_no` | Open YES/NO positions in prediction markets |
+| `close_position` | Close position and realize P&L |
+| `close_position_auto` | Auto-close by bot when SL/TP triggers |
 
-### Deploy
-```bash
-anchor deploy
-```
+## Setup
 
-### Initialize
-```bash
-anchor run initialise
-```
+### Prerequisites
 
-## Contract Functions
-
-### `initialize_config`
-Initialize the global program configuration (one-time setup).
-
-### `initialize_account`  
-Create a new paper trading account with 10,000 USDC virtual balance.
-
-### `buy_yes` / `buy_no`
-Purchase YES or NO shares in a prediction market.
-
-### `close_position`
-Close an open position and realize profit/loss.
-
-## Development
-
-### Requirements
 - Rust 1.70+
 - Solana CLI 1.16+
 - Anchor CLI 0.30+
 - Node.js 18+
 
-### Scripts
-- `anchor run initialise` - Initialize the contract configuration
-- `anchor test` - Run tests
-- `anchor build` - Build the contract
+### Build & Deploy
 
-## License
+```bash
+anchor build
+anchor deploy --provider.cluster https://rpc.magicblock.app/devnet/
+anchor run initialise
+```
 
-MIT
+### Test
+
+```bash
+anchor test
+```
