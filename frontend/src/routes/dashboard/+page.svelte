@@ -463,207 +463,194 @@
 	}
 </script>
 
-<div class="dashboard-container">
+<div class="db-page">
 
-	<!-- Position Filter Tabs -->
-	<div class="filter-tabs">
-		<button
-			class="filter-tab"
-			class:active={positionFilter === 'all'}
-			on:click={() => positionFilter = 'all'}
-		>
-			All Positions
-			<span class="tab-count">{positions.length}</span>
-		</button>
-		<button
-			class="filter-tab"
-			class:active={positionFilter === 'open'}
-			on:click={() => positionFilter = 'open'}
-		>
-			Open
-			<span class="tab-count">{openPositionsCount}</span>
-		</button>
-		<button
-			class="filter-tab"
-			class:active={positionFilter === 'closed'}
-			on:click={() => positionFilter = 'closed'}
-		>
-			Closed
-			<span class="tab-count">{closedPositionsCount}</span>
+	<!-- Header -->
+	<div class="db-header">
+		<div class="db-header-left">
+			<span class="db-header-title">Portfolio</span>
+			<span class="db-header-sub">{positions.length} position{positions.length !== 1 ? 's' : ''}</span>
+		</div>
+		<button class="db-refresh" on:click={loadPositions} disabled={loading}>
+			{#if loading}
+				<span class="db-spin"></span>
+			{:else}
+				↻
+			{/if}
+			{loading ? 'Syncing…' : 'Refresh'}
 		</button>
 	</div>
 
-	<!-- Stats Overview -->
-	<div class="stats-grid">
-		<div class="stat-card">
-			<div class="stat-label">
-				{positionFilter === 'all' ? 'Total Positions' :
-				 positionFilter === 'open' ? 'Open Positions' : 'Closed Positions'}
-			</div>
-			<div class="stat-value">{displayTotalPositions}</div>
+	<!-- Stats row -->
+	<div class="db-stats">
+		<div class="db-stat">
+			<div class="db-stat-label">Positions</div>
+			<div class="db-stat-val">{displayTotalPositions}</div>
 			{#if positionFilter === 'all'}
-				<div class="stat-breakdown">
-					<span class="breakdown-item">Open: {openPositionsCount}</span>
-					<span class="breakdown-separator">•</span>
-					<span class="breakdown-item">Closed: {closedPositionsCount}</span>
+				<div class="db-stat-sub">
+					<span class="db-sub-open">{openPositionsCount} open</span>
+					<span class="db-stat-dot">·</span>
+					<span>{closedPositionsCount} closed</span>
 				</div>
 			{/if}
 		</div>
-		<div class="stat-card">
-			<div class="stat-label">Total Value</div>
-			<div class="stat-value">{formatUSDC(displayTotalValue)}</div>
+		<div class="db-stat">
+			<div class="db-stat-label">Portfolio Value</div>
+			<div class="db-stat-val orange">{formatUSDC(displayTotalValue)}</div>
 			{#if positionFilter === 'all'}
-				<div class="stat-breakdown">
-					<span class="breakdown-item">Open: {formatUSDC(openPositionsValue)}</span>
-					<span class="breakdown-separator">•</span>
-					<span class="breakdown-item">Closed: {formatUSDC(closedPositionsValue)}</span>
+				<div class="db-stat-sub">
+					<span class="db-sub-open">{formatUSDC(openPositionsValue)}</span>
+					<span class="db-stat-dot">·</span>
+					<span>{formatUSDC(closedPositionsValue)}</span>
 				</div>
 			{/if}
 		</div>
-		<div class="stat-card">
-			<div class="stat-label">Total P&L</div>
-			<div class="stat-value" class:positive={displayTotalPnl >= 0} class:negative={displayTotalPnl < 0}>
+		<div class="db-stat">
+			<div class="db-stat-label">Total P&L</div>
+			<div class="db-stat-val" class:db-pos={displayTotalPnl >= 0} class:db-neg={displayTotalPnl < 0}>
 				{formatUSDC(displayTotalPnl)}
 			</div>
 			{#if positionFilter === 'all'}
-				<div class="stat-breakdown">
-					<span class="breakdown-item" class:positive={openPositionsPnl >= 0} class:negative={openPositionsPnl < 0}>
-						Open: {formatUSDC(openPositionsPnl)}
-					</span>
-					<span class="breakdown-separator">•</span>
-					<span class="breakdown-item" class:positive={closedPositionsPnl >= 0} class:negative={closedPositionsPnl < 0}>
-						Closed: {formatUSDC(closedPositionsPnl)}
-					</span>
+				<div class="db-stat-sub">
+					<span class:db-pos={openPositionsPnl >= 0} class:db-neg={openPositionsPnl < 0}>{formatUSDC(openPositionsPnl)}</span>
+					<span class="db-stat-dot">·</span>
+					<span class:db-pos={closedPositionsPnl >= 0} class:db-neg={closedPositionsPnl < 0}>{formatUSDC(closedPositionsPnl)}</span>
 				</div>
 			{/if}
 		</div>
 	</div>
 
-	<!-- Positions Table -->
-	<div class="positions-section">
-		<div class="section-header">
-			<h2>
-				{positionFilter === 'all' ? 'All Positions' :
-				 positionFilter === 'open' ? 'Open Positions' : 'Closed Positions'}
-			</h2>
-			<button class="refresh-btn" on:click={loadPositions} disabled={loading}>
-				{loading ? 'Loading...' : 'Refresh'}
-			</button>
-		</div>
+	<!-- Filter tabs -->
+	<div class="db-tabs">
+		<button class="db-tab" class:db-tab-active={positionFilter === 'all'} on:click={() => positionFilter = 'all'}>
+			All <span class="db-tab-count">{positions.length}</span>
+		</button>
+		<button class="db-tab" class:db-tab-active={positionFilter === 'open'} on:click={() => positionFilter = 'open'}>
+			Open <span class="db-tab-count">{openPositionsCount}</span>
+		</button>
+		<button class="db-tab" class:db-tab-active={positionFilter === 'closed'} on:click={() => positionFilter = 'closed'}>
+			Closed <span class="db-tab-count">{closedPositionsCount}</span>
+		</button>
+	</div>
 
+	<!-- Positions -->
+	<div class="db-body">
 		{#if loading}
-			<div class="loading-state">
-				<div class="spinner"></div>
-				<p>Loading positions...</p>
+			<div class="db-loading">
+				<div class="db-spin-lg"></div>
+				<span>Loading positions…</span>
 			</div>
 		{:else if filteredPositions.length === 0}
-			<div class="empty-state">
-				<div class="empty-icon"></div>
-				<h3>No Active Positions</h3>
-				<p>Start trading to see your positions here</p>
-				<button class="cta-button" on:click={() => goto('/')}>
-					Explore Markets
-				</button>
+			<div class="db-empty">
+				<div class="db-empty-icon">◎</div>
+				<div class="db-empty-title">No positions</div>
+				<div class="db-empty-sub">Start trading to see your positions here</div>
+				<button class="db-cta" on:click={() => goto('/')}>Explore Markets</button>
 			</div>
 		{:else}
-			<div class="table-container">
-				<table class="positions-table">
-					<thead>
-						<tr>
-							<th>Market</th>
-							<th>Type</th>
-							<th>Amount</th>
-							<th>Shares</th>
-							<th>Entry Price</th>
-							<th>Current Price</th>
-							<th>Closed Price</th>
-							<th>Closed At</th>
-							<th>SL</th>
-							<th>TP</th>
-							<th>P&L</th>
-							<th>Status</th>
-							<th>Actions</th>
-						</tr>
-					</thead>
-					<tbody>
-						{#each filteredPositions as position (position.id)}
-							<tr>
-								<td class="market-cell">
-									<button class="market-link" on:click={() => goToMarket(position.marketId)}>
-										{position.marketName}
-									</button>
-								</td>
-								<td>
-									<span class="badge" class:yes={position.predictionType === 'Yes'} class:no={position.predictionType === 'No'}>
-										{position.predictionType}
-									</span>
-								</td>
-								<td>{formatUSDC(position.amountUsdc)}</td>
-								<td>{position.shares.toFixed(2)}</td>
-								<td>${position.pricePerShare.toFixed(4)}</td>
-								<td>
-									{#if position.status === 'Active'}
-										${position.currentPrice.toFixed(4)}
-									{:else}
-										<span class="text-muted">—</span>
-									{/if}
-								</td>
-								<td>
-									{#if position.status === 'Closed' && position.closedPrice !== undefined}
-										${position.closedPrice.toFixed(4)}
-									{:else}
-										<span class="text-muted">—</span>
-									{/if}
-								</td>
-								<td>
-									{#if position.status === 'Closed' && position.closedAt}
-										<span class="date-cell">{position.closedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-									{:else}
-										<span class="text-muted">—</span>
-									{/if}
-								</td>
-								<td>
-									{#if position.stopLoss}
-										<span class="sltp-badge sl-badge">{position.stopLoss.toFixed(1)}¢</span>
-									{:else}
-										<span class="text-muted">—</span>
-									{/if}
-								</td>
-								<td>
-									{#if position.takeProfit}
-										<span class="sltp-badge tp-badge">{position.takeProfit.toFixed(1)}¢</span>
-									{:else}
-										<span class="text-muted">—</span>
-									{/if}
-								</td>
-								<td class:positive={position.pnl >= 0} class:negative={position.pnl < 0}>
-									{formatUSDC(position.pnl)}
-									<span class="pnl-percentage">({formatPercentage(position.pnlPercentage)})</span>
-								</td>
-								<td>
-									<span class="status-badge" class:active={position.status === 'Active'} class:closed={position.status === 'Closed'}>
-										{position.status}
-									</span>
-								</td>
-								<td>
-									{#if position.status === 'Active'}
-										<div class="action-cell">
-											<button class="action-btn" on:click={() => sellPosition(position.id, position.currentPrice, position)}>Sell</button>
-											{#if isPositionPosted(position)}
-												<span class="posted-label">Posted</span>
-											{/if}
-										</div>
-									{:else if isPositionPosted(position)}
-										<span class="posted-label">Posted</span>
-									{:else}
-										<button class="action-btn post-btn" on:click={() => openPostModal(position)}>Post</button>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+			<!-- Table header -->
+			<div class="db-row db-row-head">
+				<span class="db-col-market">Market</span>
+				<span class="db-col-type">Type</span>
+				<span class="db-col-num">Invested</span>
+				<span class="db-col-num">Shares</span>
+				<span class="db-col-num">Entry</span>
+				<span class="db-col-num">Current</span>
+				<span class="db-col-num">P&L</span>
+				<span class="db-col-sltp">SL / TP</span>
+				<span class="db-col-date">Closed At</span>
+				<span class="db-col-status">Status</span>
+				<span class="db-col-action">Action</span>
 			</div>
+
+			{#each filteredPositions as position (position.id)}
+				<div class="db-row db-row-data">
+					<!-- Market -->
+					<span class="db-col-market">
+						<button class="db-market-btn" on:click={() => goToMarket(position.marketId)}>
+							{position.marketName}
+						</button>
+					</span>
+
+					<!-- Type -->
+					<span class="db-col-type">
+						<span class="db-type-badge" class:db-yes={position.predictionType === 'Yes'} class:db-no={position.predictionType === 'No'}>
+							{position.predictionType}
+						</span>
+					</span>
+
+					<!-- Invested -->
+					<span class="db-col-num db-mono">{formatUSDC(position.amountUsdc)}</span>
+
+					<!-- Shares -->
+					<span class="db-col-num db-mono">{position.shares.toFixed(2)}</span>
+
+					<!-- Entry price -->
+					<span class="db-col-num db-mono">{(position.pricePerShare * 100).toFixed(1)}¢</span>
+
+					<!-- Current / closed price -->
+					<span class="db-col-num db-mono">
+						{#if position.status === 'Closed' && position.closedPrice !== undefined}
+							{(position.closedPrice * 100).toFixed(1)}¢
+						{:else if position.status === 'Active'}
+							{(position.currentPrice * 100).toFixed(1)}¢
+						{:else}
+							<span class="db-muted">—</span>
+						{/if}
+					</span>
+
+					<!-- P&L -->
+					<span class="db-col-num db-mono" class:db-pos={position.pnl >= 0} class:db-neg={position.pnl < 0}>
+						{formatUSDC(position.pnl)}
+						<span class="db-pct">({formatPercentage(position.pnlPercentage)})</span>
+					</span>
+
+					<!-- SL / TP -->
+					<span class="db-col-sltp">
+						{#if position.stopLoss}
+							<span class="db-sltp-badge db-sl">{position.stopLoss.toFixed(1)}¢</span>
+						{:else}
+							<span class="db-muted">—</span>
+						{/if}
+						<span class="db-muted db-sltp-sep">/</span>
+						{#if position.takeProfit}
+							<span class="db-sltp-badge db-tp">{position.takeProfit.toFixed(1)}¢</span>
+						{:else}
+							<span class="db-muted">—</span>
+						{/if}
+					</span>
+
+					<!-- Closed At -->
+					<span class="db-col-date db-mono">
+						{#if position.status === 'Closed' && position.closedAt}
+							{position.closedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+						{:else}
+							<span class="db-muted">—</span>
+						{/if}
+					</span>
+
+					<!-- Status -->
+					<span class="db-col-status">
+						<span class="db-status" class:db-status-active={position.status === 'Active'} class:db-status-closed={position.status === 'Closed'}>
+							{position.status}
+						</span>
+					</span>
+
+					<!-- Actions -->
+					<span class="db-col-action">
+						{#if position.status === 'Active'}
+							<button class="db-sell-btn" on:click={() => sellPosition(position.id, position.currentPrice, position)}>Sell</button>
+							{#if isPositionPosted(position)}
+								<span class="db-posted">Posted</span>
+							{/if}
+						{:else if isPositionPosted(position)}
+							<span class="db-posted">Posted</span>
+						{:else}
+							<button class="db-post-btn" on:click={() => openPostModal(position)}>Post</button>
+						{/if}
+					</span>
+				</div>
+			{/each}
 		{/if}
 	</div>
 </div>
@@ -761,686 +748,207 @@
 {/if}
 
 <style>
-	.dashboard-container {
+	/* ── PAGE ── */
+	.db-page {
 		min-height: 100vh;
-		background: #000000;
-		color: white;
-		padding: 20px;
-	}
-
-	:global(.light-mode) .dashboard-container {
-		background: #FFFFFF;
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .filter-tabs {
-		background: #F5F5F5;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .filter-tab {
-		background: transparent;
-		border-color: #E0E0E0;
-		color: #666;
-	}
-
-	:global(.light-mode) .filter-tab:hover {
-		background: rgba(0, 181, 112, 0.05);
-	}
-
-	:global(.light-mode) .filter-tab.active {
-		background: rgba(0, 181, 112, 0.1);
-		border-color: #00B570;
-		color: #00B570;
-	}
-
-	:global(.light-mode) .tab-count {
-		background: rgba(0, 181, 112, 0.15);
-		color: #00B570;
-	}
-
-	:global(.light-mode) .stat-card {
-		background: #FFFFFF;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .stat-label {
-		color: #666;
-	}
-
-	:global(.light-mode) .stat-value {
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .stat-breakdown {
-		color: #666;
-	}
-
-	:global(.light-mode) .breakdown-item {
-		color: #666;
-	}
-
-	:global(.light-mode) .position-card {
-		background: #FFFFFF;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .position-card:hover {
-		border-color: #CCC;
-		background: #FAFAFA;
-	}
-
-	:global(.light-mode) .position-header {
-		border-bottom-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .market-name {
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .prediction-badge {
-		background: rgba(0, 181, 112, 0.1);
-		color: #00B570;
-	}
-
-	:global(.light-mode) .prediction-badge.no {
-		background: rgba(255, 107, 107, 0.1);
-		color: #FF6B6B;
-	}
-
-	:global(.light-mode) .close-position-btn {
-		background: #FFFFFF;
-		color: #FF6B6B;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .close-position-btn:hover {
-		background: #FF6B6B;
-		color: #FFFFFF;
-	}
-
-	:global(.light-mode) .position-details {
-		color: #666;
-	}
-
-	:global(.light-mode) .detail-label {
-		color: #999;
-	}
-
-	:global(.light-mode) .detail-value {
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .pnl-display {
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .pnl-display.positive {
-		color: #00B570;
-	}
-
-	:global(.light-mode) .pnl-display.negative {
-		color: #FF6B6B;
-	}
-
-	:global(.light-mode) .close-modal-btn {
-		background: transparent;
-		color: #999;
-		border: none;
-	}
-
-	:global(.light-mode) .close-modal-btn:hover {
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .modal-body {
-		color: #333;
-	}
-
-	:global(.light-mode) .confirm-btn {
-		background: #00B570;
-	}
-
-	:global(.light-mode) .confirm-btn:hover {
-		background: #009560;
-	}
-
-	:global(.light-mode) .cancel-btn {
-		background: #F5F5F5;
-		color: #1A1A1A;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .cancel-btn:hover {
-		background: #E0E0E0;
-	}
-
-	:global(.light-mode) .empty-state {
-		color: #999;
-	}
-
-	:global(.light-mode) .empty-state svg {
-		stroke: #999;
-	}
-
-	:global(.light-mode) .loading-state {
-		color: #666;
-	}
-
-	:global(.light-mode) .empty-icon {
-		background: #F5F5F5;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .empty-state h3 {
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .empty-state p {
-		color: #666;
-	}
-
-	:global(.light-mode) .cta-button {
-		background: #00B570;
-		color: #FFFFFF;
-	}
-
-	:global(.light-mode) .cta-button:hover {
-		background: #009560;
-	}
-
-	:global(.light-mode) .table-container {
-		background: #FFFFFF;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .positions-table {
-		background: #FFFFFF;
-	}
-
-	:global(.light-mode) .positions-table thead {
-		background: #F5F5F5;
-		border-bottom-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .positions-table th {
-		color: #666;
-		border-bottom-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .positions-table td {
-		color: #1A1A1A;
-		border-bottom-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .positions-table tbody tr:hover {
-		background: #FAFAFA;
-	}
-
-	:global(.light-mode) .market-cell {
-		color: #1A1A1A;
-	}
-
-	:global(.light-mode) .type-badge {
-		background: rgba(0, 181, 112, 0.1);
-		color: #00B570;
-	}
-
-	:global(.light-mode) .type-badge.no {
-		background: rgba(255, 107, 107, 0.1);
-		color: #FF6B6B;
-	}
-
-	:global(.light-mode) .status-badge {
-		background: rgba(0, 181, 112, 0.1);
-		color: #00B570;
-	}
-
-	:global(.light-mode) .status-badge.closed {
-		background: rgba(139, 146, 171, 0.1);
-		color: #666;
-	}
-
-	:global(.light-mode) .refresh-btn {
-		background: #FFFFFF;
-		color: #00B570;
-		border-color: #E0E0E0;
-	}
-
-	:global(.light-mode) .refresh-btn:hover {
-		background: rgba(0, 181, 112, 0.1);
-	}
-
-	.filter-tabs {
-		display: flex;
-		gap: 12px;
-		max-width: 1400px;
-		margin: 0 auto 24px;
-		padding: 4px;
-		background: #000000;
-		border: 1px solid #404040;
-		border-radius: 12px;
-	}
-
-	.filter-tab {
-		flex: 1;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 8px;
-		padding: 12px 20px;
-		background: transparent;
-		border: none;
-		border-radius: 8px;
-		color: #8B92AB;
-		font-size: 14px;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.filter-tab:hover {
-		background: rgba(249, 115, 22, 0.05);
-		color: #E8E8E8;
-	}
-
-	.filter-tab.active {
-		background: rgba(249, 115, 22, 0.1);
-		color: #F97316;
-		border: 1px solid #F97316;
-	}
-
-	.tab-count {
-		padding: 2px 8px;
-		background: rgba(249, 115, 22, 0.15);
-		border-radius: 12px;
-		font-size: 12px;
-		font-weight: 700;
-	}
-
-	.filter-tab.active .tab-count {
-		background: #F97316;
-		color: #0A0E1A;
-	}
-
-	.dashboard-header {
-		margin-bottom: 32px;
-	}
-
-	.header-content {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		max-width: 1400px;
+		background: #000;
+		color: #e8e8e8;
+		padding: 20px 24px 40px;
+		max-width: 1440px;
 		margin: 0 auto;
+		font-family: inherit;
 	}
 
-	h1 {
-		font-size: 32px;
-		font-weight: 700;
-		margin: 0;
+	/* ── HEADER ── */
+	.db-header {
+		display: flex; align-items: center; justify-content: space-between;
+		padding-bottom: 20px;
+		border-bottom: 1px solid #111;
+		margin-bottom: 20px;
 	}
+	.db-header-left { display: flex; align-items: baseline; gap: 10px; }
+	.db-header-title { font-size: 18px; font-weight: 700; color: #e8e8e8; letter-spacing: -0.02em; }
+	.db-header-sub { font-size: 12px; color: #e8e8e8; }
+	.db-refresh {
+		display: flex; align-items: center; gap: 6px;
+		background: transparent; border: 1px solid #1e1e1e;
+		color: #e8e8e8; font-size: 12px; font-weight: 600;
+		padding: 6px 12px; border-radius: 6px; cursor: pointer;
+		transition: all 0.15s; letter-spacing: 0.02em;
+	}
+	.db-refresh:hover:not(:disabled) { border-color: #F97316; color: #F97316; }
+	.db-refresh:disabled { opacity: 0.4; cursor: not-allowed; }
+	.db-spin {
+		width: 11px; height: 11px;
+		border: 2px solid #333; border-top-color: #F97316;
+		border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
+	}
+	@keyframes spin { to { transform: rotate(360deg); } }
 
-	.stats-grid {
+	/* ── STATS ── */
+	.db-stats {
+		display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+		margin-bottom: 20px;
+	}
+	.db-stat {
+		background: #070707; border: 1px solid #1e1e1e;
+		border-top: 2px solid #222;
+		border-radius: 8px; padding: 18px 20px;
+		position: relative; overflow: hidden;
+	}
+	.db-stat::before {
+		content: ''; position: absolute; top: 0; left: 0;
+		width: 3px; height: 100%; background: #1e1e1e;
+	}
+	.db-stat-label { font-size: 10px; color: #e8e8e8; text-transform: uppercase; letter-spacing: 0.09em; font-weight: 700; margin-bottom: 8px; }
+	.db-stat-val { font-size: 26px; font-weight: 800; color: #fff; font-variant-numeric: tabular-nums; margin-bottom: 6px; letter-spacing: -0.02em; }
+	.db-stat-val.orange { color: #F97316; }
+	.db-stat-sub { font-size: 11.5px; color: #e8e8e8; display: flex; gap: 6px; align-items: center; }
+	.db-stat-dot { color: #e8e8e8; }
+	.db-sub-open { color: #e8e8e8; font-weight: 600; }
+
+	/* ── TABS ── */
+	.db-tabs {
+		display: flex; gap: 0;
+		border-bottom: 1px solid #111;
+		margin-bottom: 0;
+	}
+	.db-tab {
+		background: transparent; border: none;
+		border-bottom: 2px solid transparent; margin-bottom: -1px;
+		color: #e8e8e8; padding: 10px 18px; font-size: 13px; font-weight: 700;
+		cursor: pointer; transition: color 0.15s; display: flex; align-items: center; gap: 7px;
+		letter-spacing: 0.01em;
+	}
+	.db-tab:hover { color: #e8e8e8; }
+	.db-tab-active { color: #fff; border-bottom-color: #F97316; }
+	.db-tab-count {
+		font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+		background: #111; color: #e8e8e8;
+	}
+	.db-tab-active .db-tab-count { background: rgba(249,115,22,0.18); color: #F97316; }
+
+	/* ── TABLE ── */
+	.db-body {
+		background: #000; border: 1px solid #1e1e1e; border-top: none;
+		border-radius: 0 0 8px 8px; overflow-x: auto;
+	}
+	.db-row {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-		gap: 20px;
-		max-width: 1400px;
-		margin: 0 auto 32px;
-	}
-
-	.stat-card {
-		background: #000000;
-		border: 1px solid #404040;
-		border-radius: 12px;
-		padding: 24px;
-	}
-
-	.stat-label {
-		font-size: 14px;
-		color: #8B92AB;
-		margin-bottom: 8px;
-	}
-
-	.stat-value {
-		font-size: 28px;
-		font-weight: 700;
-		color: white;
-	}
-
-	.stat-value.positive {
-		color: #00D68F;
-	}
-
-	.stat-value.negative {
-		color: #FF6B6B;
-	}
-
-	.stat-breakdown {
-		display: flex;
+		grid-template-columns: minmax(180px,1fr) 60px 95px 75px 72px 72px 120px 95px 105px 78px 95px;
 		align-items: center;
-		gap: 8px;
-		margin-top: 12px;
-		font-size: 13px;
-		color: #8B92AB;
+		padding: 0 18px;
+		border-bottom: 1px solid #111;
+		gap: 10px;
+	}
+	.db-row:last-child { border-bottom: none; }
+	.db-row-head {
+		padding-top: 11px; padding-bottom: 11px;
+		background: #080808; border-bottom: 1px solid #1e1e1e;
+	}
+	.db-row-head span {
+		font-size: 9.5px; font-weight: 800; color: #e8e8e8;
+		text-transform: uppercase; letter-spacing: 0.09em;
+	}
+	.db-row-data {
+		padding-top: 14px; padding-bottom: 14px;
+		transition: background 0.1s;
+	}
+	.db-row-data:hover { background: rgba(249,115,22,0.04); border-color: #1e1e1e; }
+
+	/* ── COLUMNS ── */
+	.db-col-market { min-width: 0; }
+	.db-col-num { text-align: right; }
+	.db-col-sltp { display: flex; align-items: center; gap: 4px; justify-content: center; }
+	.db-col-status { text-align: center; }
+	.db-col-action { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+	.db-col-type { text-align: center; }
+	.db-col-date { font-size: 11.5px; color: #e8e8e8; white-space: nowrap; }
+
+	/* Market link */
+	.db-market-btn {
+		background: none; border: none; padding: 0;
+		color: #e8e8e8; font-size: 12.5px; font-weight: 600;
+		cursor: pointer; text-align: left;
+		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+		max-width: 100%; transition: color 0.15s; display: block;
+	}
+	.db-market-btn:hover { color: #F97316; }
+
+	/* Type badge */
+	.db-type-badge {
+		font-size: 10.5px; font-weight: 800; padding: 4px 9px;
+		border-radius: 4px; letter-spacing: 0.04em;
+	}
+	.db-yes { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+	.db-no  { background: rgba(239,68,68,0.12);  color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+
+	/* Numbers */
+	.db-mono { font-family: 'SF Mono','Fira Code',monospace; font-size: 12.5px; color: #e8e8e8; }
+	.db-muted { color: #e8e8e8; font-size: 12px; }
+	.db-pct { font-size: 10.5px; margin-left: 3px; }
+
+	/* PnL colors */
+	.db-pos { color: #10b981 !important; }
+	.db-neg { color: #ef4444 !important; }
+	.db-pos .db-pct { color: rgba(16,185,129,0.8); }
+	.db-neg .db-pct { color: rgba(239,68,68,0.8); }
+
+	/* SL/TP badges */
+	.db-sltp-badge { font-size: 10.5px; font-weight: 700; padding: 3px 7px; border-radius: 3px; white-space: nowrap; }
+	.db-sl { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid rgba(239,68,68,0.3); }
+	.db-tp { background: rgba(16,185,129,0.12); color: #10b981; border: 1px solid rgba(16,185,129,0.3); }
+	.db-sltp-sep { font-size: 10px; color: #e8e8e8; }
+
+	/* Status */
+	.db-status { font-size: 10.5px; font-weight: 700; padding: 4px 9px; border-radius: 4px; letter-spacing: 0.03em; }
+	.db-status-active { background: rgba(249,115,22,0.12); color: #F97316; border: 1px solid rgba(249,115,22,0.3); }
+	.db-status-closed { background: rgba(255,255,255,0.06); color: #e8e8e8; border: 1px solid #222; }
+
+	/* Action buttons */
+	.db-sell-btn {
+		background: transparent; border: 1px solid rgba(239,68,68,0.3);
+		color: #ef4444; font-size: 11px; font-weight: 700;
+		padding: 4px 10px; border-radius: 5px; cursor: pointer;
+		transition: all 0.15s; letter-spacing: 0.02em;
+	}
+	.db-sell-btn:hover { background: rgba(239,68,68,0.12); border-color: #ef4444; }
+	.db-post-btn {
+		background: transparent; border: 1px solid rgba(249,115,22,0.3);
+		color: #F97316; font-size: 11px; font-weight: 700;
+		padding: 4px 10px; border-radius: 5px; cursor: pointer;
+		transition: all 0.15s;
+	}
+	.db-post-btn:hover { background: rgba(249,115,22,0.1); border-color: #F97316; }
+	.db-posted {
+		font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
+		background: rgba(16,185,129,0.08); color: #10b981;
+		border: 1px solid rgba(16,185,129,0.2);
 	}
 
-	.breakdown-item {
-		font-size: 12px;
+	/* Loading / empty */
+	.db-loading {
+		display: flex; align-items: center; gap: 10px; justify-content: center;
+		padding: 60px 20px; color: #e8e8e8; font-size: 13px;
 	}
-
-	.breakdown-item.positive {
-		color: #00D68F;
+	.db-spin-lg {
+		width: 18px; height: 18px;
+		border: 2px solid #1a1a1a; border-top-color: #F97316;
+		border-radius: 50%; animation: spin 0.7s linear infinite;
 	}
-
-	.breakdown-item.negative {
-		color: #FF6B6B;
+	.db-empty {
+		display: flex; flex-direction: column; align-items: center;
+		padding: 72px 20px; gap: 8px;
 	}
-
-	.breakdown-separator {
-		color: #2A2F45;
-		font-weight: bold;
+	.db-empty-icon { font-size: 32px; color: #e8e8e8; margin-bottom: 4px; }
+	.db-empty-title { font-size: 15px; font-weight: 700; color: #e8e8e8; }
+	.db-empty-sub { font-size: 12px; color: #e8e8e8; margin-bottom: 8px; }
+	.db-cta {
+		padding: 9px 20px; background: #F97316; color: #000;
+		border: none; border-radius: 7px; font-size: 13px; font-weight: 700;
+		cursor: pointer; transition: background 0.15s;
 	}
-
-	.positions-section {
-		max-width: 1400px;
-		margin: 0 auto;
-		background: #000000;
-		border: 1px solid #404040;
-		border-radius: 12px;
-		padding: 24px;
-	}
-
-	.section-header {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-bottom: 24px;
-	}
-
-	h2 {
-		font-size: 20px;
-		font-weight: 600;
-		margin: 0;
-	}
-
-	.refresh-btn {
-		padding: 8px 16px;
-		background: #000000;
-		color: white;
-		border: 1px solid #FFFFFF;
-		border-radius: 8px;
-		cursor: pointer;
-		font-size: 14px;
-		transition: all 0.2s;
-	}
-
-	.refresh-btn:hover:not(:disabled) {
-		background: rgba(249, 115, 22, 0.1);
-		border-color: #F97316;
-	}
-
-	.refresh-btn:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
-
-	.loading-state {
-		text-align: center;
-		padding: 60px 20px;
-	}
-
-	.spinner {
-		width: 40px;
-		height: 40px;
-		border: 3px solid #2A2F45;
-		border-top-color: #F97316;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-		margin: 0 auto 16px;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
-	.empty-state {
-		text-align: center;
-		padding: 60px 20px;
-	}
-
-	.empty-icon {
-		font-size: 64px;
-		margin-bottom: 16px;
-	}
-
-	.empty-state h3 {
-		font-size: 20px;
-		font-weight: 600;
-		margin: 0 0 8px 0;
-	}
-
-	.empty-state p {
-		color: #8B92AB;
-		margin-bottom: 24px;
-	}
-
-	.cta-button {
-		padding: 12px 24px;
-		background: #F97316;
-		color: white;
-		border: none;
-		border-radius: 8px;
-		font-size: 14px;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.cta-button:hover {
-		background: #ea580c;
-		transform: translateY(-1px);
-	}
-
-	.table-container {
-		overflow-x: auto;
-	}
-
-	.positions-table {
-		width: 100%;
-		border-collapse: collapse;
-	}
-
-	.positions-table th {
-		text-align: left;
-		padding: 12px;
-		font-size: 12px;
-		font-weight: 600;
-		color: #8B92AB;
-		border-bottom: 1px solid #404040;
-		text-transform: uppercase;
-		letter-spacing: 0.5px;
-	}
-
-	.positions-table td {
-		padding: 16px 12px;
-		border-bottom: 1px solid #404040;
-		font-size: 14px;
-	}
-
-	.positions-table tr:hover {
-		background: rgba(249, 115, 22, 0.05);
-	}
-
-	.market-cell {
-		max-width: 300px;
-	}
-
-	.market-link {
-		background: none;
-		border: none;
-		color: #F97316;
-		cursor: pointer;
-		padding: 0;
-		font-size: 14px;
-		text-align: left;
-		text-decoration: none;
-		transition: color 0.2s;
-	}
-
-	.market-link:hover {
-		color: #00D4FF;
-		text-decoration: underline;
-	}
-
-	.badge {
-		padding: 4px 8px;
-		border-radius: 4px;
-		font-size: 12px;
-		font-weight: 600;
-	}
-
-	.badge.yes {
-		background: rgba(0, 214, 143, 0.1);
-		color: #00D68F;
-	}
-
-	.badge.no {
-		background: rgba(255, 107, 107, 0.1);
-		color: #FF6B6B;
-	}
-
-	.positive {
-		color: #00D68F;
-	}
-
-	.negative {
-		color: #FF6B6B;
-	}
-
-	.pnl-percentage {
-		font-size: 12px;
-		opacity: 0.8;
-		margin-left: 4px;
-	}
-
-	.status-badge {
-		padding: 4px 8px;
-		border-radius: 4px;
-		font-size: 12px;
-		font-weight: 600;
-	}
-
-	.status-badge.active {
-		background: rgba(249, 115, 22, 0.1);
-		color: #F97316;
-	}
-
-	.status-badge.closed {
-		background: rgba(139, 146, 171, 0.1);
-		color: #8B92AB;
-	}
-
-	.sltp-display {
-		display: flex;
-		flex-direction: row;
-		gap: 8px;
-		align-items: center;
-	}
-
-	.sltp-badge {
-		padding: 3px 8px;
-		border-radius: 4px;
-		font-size: 11px;
-		font-weight: 700;
-		letter-spacing: 0.02em;
-		white-space: nowrap;
-		display: inline-block;
-	}
-
-	.sltp-badge.sl-badge {
-		background: rgba(255, 71, 87, 0.15);
-		color: #FF4757;
-		border: 1px solid rgba(255, 71, 87, 0.3);
-	}
-
-	.sltp-badge.tp-badge {
-		background: rgba(0, 208, 132, 0.15);
-		color: #00D084;
-		border: 1px solid rgba(0, 208, 132, 0.3);
-	}
-
-	.action-btn {
-		padding: 6px 12px;
-		background: #000000;
-		color: white;
-		border: 1px solid #FFFFFF;
-		border-radius: 6px;
-		cursor: pointer;
-		font-size: 12px;
-		transition: all 0.2s;
-	}
-
-	.action-btn:hover {
-		background: #FF6B6B;
-		border-color: #FF6B6B;
-	}
-
-	.action-btn.post-btn {
-		border-color: #F97316;
-		color: #F97316;
-		margin-left: 4px;
-	}
-
-	.action-btn.post-btn:hover {
-		background: #F97316;
-		color: #fff;
-		border-color: #F97316;
-	}
-
-	.date-cell {
-		font-size: 12px;
-		color: #9ca3af;
-		white-space: nowrap;
-	}
-
-	.action-cell {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-	}
-
-	.posted-label {
-		font-size: 12px;
-		font-weight: 600;
-		color: #10b981;
-		padding: 4px 10px;
-		border: 1px solid rgba(16, 185, 129, 0.3);
-		border-radius: 4px;
-		background: rgba(16, 185, 129, 0.1);
-	}
-
-	@media (max-width: 768px) {
-		.dashboard-container {
-			padding: 16px;
-		}
-
-		h1 {
-			font-size: 24px;
-		}
-
-		.stats-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.table-container {
-			overflow-x: scroll;
-		}
-
-		.positions-table {
-			min-width: 900px;
-		}
-	}
+	.db-cta:hover { background: #ea580c; }
 
 	/* Modal Styles */
 	/* Polymock Modal System */
@@ -1522,7 +1030,7 @@
 	.pm-title.error-title { color: #ef4444; }
 
 	.pm-desc {
-		color: #8b92ab;
+		color: #e8e8e8;
 		font-size: 14px;
 		line-height: 1.6;
 		margin: 0 0 24px 0;
@@ -1559,7 +1067,7 @@
 	}
 
 	.pm-label {
-		color: #666;
+		color: #e8e8e8;
 		font-size: 13px;
 	}
 
@@ -1578,7 +1086,7 @@
 
 	.pm-shares-label {
 		display: block;
-		color: #666;
+		color: #e8e8e8;
 		font-size: 13px;
 		margin-bottom: 8px;
 	}
@@ -1623,7 +1131,7 @@
 	}
 
 	.pm-shares-info {
-		color: #555;
+		color: #e8e8e8;
 		font-size: 12px;
 	}
 
@@ -1661,12 +1169,12 @@
 
 	.pm-btn.secondary {
 		background: transparent;
-		color: #8b92ab;
+		color: #e8e8e8;
 		border: 1px solid #2a2a2a;
 	}
 
 	.pm-btn.secondary:hover {
-		border-color: #444;
+		border-color: #e8e8e8;
 		color: #ccc;
 	}
 
@@ -1692,7 +1200,7 @@
 	}
 
 	:global(.light-mode) .pm-shares-info {
-		color: #666;
+		color: #e8e8e8;
 	}
 
 	/* Toast Notification */
@@ -1756,7 +1264,7 @@
 		margin-left: auto;
 		background: none;
 		border: none;
-		color: #666;
+		color: #e8e8e8;
 		font-size: 18px;
 		line-height: 1;
 		cursor: pointer;
@@ -1787,20 +1295,19 @@
 		}
 	}
 
-	:global(.light-mode) .toast {
-		background: #fff;
-		border-color: #e0e0e0;
+	/* ── RESPONSIVE ── */
+	@media (max-width: 1280px) {
+		.db-row {
+			grid-template-columns: minmax(150px,1fr) 58px 88px 68px 68px 68px 110px 88px 98px 72px 88px;
+		}
 	}
-
-	:global(.light-mode) .toast-close {
-		color: #999;
+	@media (max-width: 768px) {
+		.db-page { padding: 14px 14px 40px; }
+		.db-stats { grid-template-columns: 1fr 1fr; }
+		.db-body { overflow-x: scroll; }
+		.db-row { min-width: 960px; }
 	}
-
-	:global(.light-mode) .toast-close:hover {
-		color: #333;
-	}
-
-	:global(.light-mode) .toast-msg {
-		color: #555;
+	@media (max-width: 480px) {
+		.db-stats { grid-template-columns: 1fr; }
 	}
 </style>

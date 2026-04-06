@@ -4,6 +4,28 @@ import type { RequestHandler } from './$types';
 
 const SYNTHESIS_API_BASE = 'https://synthesis.trade/api/v1';
 
+// Maps our display category names to the tag slugs Synthesis/Polymarket actually uses
+const TAG_MAP: Record<string, string> = {
+	'economy':       'economics',
+	'elections':     'global-elections',
+	'finance':       'business',
+	'world':         'geopolitics',
+	'politics':      'Politics',
+	'entertainment': 'Entertainment',
+	'health':        'Health',
+	'culture':       'pop-culture',
+};
+
+function normalizeTags(raw: string): string {
+	return raw
+		.split(',')
+		.map(t => {
+			const trimmed = t.trim().toLowerCase();
+			return TAG_MAP[trimmed] ?? trimmed;
+		})
+		.join(',');
+}
+
 export const GET: RequestHandler = async ({ url }) => {
 	try {
 		const limit = url.searchParams.get('limit') || '5';
@@ -18,12 +40,13 @@ export const GET: RequestHandler = async ({ url }) => {
 			limit,
 			markets: 'true',
 		});
-		if (tags) params.set('tags', tags);
+		if (tags) params.set('tags', normalizeTags(tags));
 		// Filter for ended markets: ends_at before now
 		if (ended === 'true') {
 			params.set('max_ends_at', new Date().toISOString());
 		}
 
+		console.log('[markets] Synthesis request:', `${SYNTHESIS_API_BASE}/markets?${params}`);
 		const response = await fetch(`${SYNTHESIS_API_BASE}/markets?${params}`, {
 			headers: {
 				'Accept': 'application/json',
@@ -40,6 +63,7 @@ export const GET: RequestHandler = async ({ url }) => {
 		if (!data.success || !data.response) {
 			throw new Error('Invalid response from Synthesis API');
 		}
+		console.log(`[markets] Synthesis returned ${data.response.length} events`);
 
 		const now = new Date();
 
@@ -57,19 +81,16 @@ export const GET: RequestHandler = async ({ url }) => {
 				if (ended === 'true' && !endsAt) continue;
 				if (ended === 'false' && hasEnded) continue;
 
-				// Determine outcome: prefer winner_token_id, then resolved flag, then prices
+				// Determine outcome using resolved flag and winner_token_id from the API
 				const leftPrice = parseFloat(market.left_price || '0');
 				const rightPrice = parseFloat(market.right_price || '0');
 				let resolvedOutcome: string | null = null;
-				if (market.winner_token_id && market.winner_token_id === market.left_token_id) {
-					resolvedOutcome = market.left_outcome || 'Yes';
-				} else if (market.winner_token_id && market.winner_token_id === market.right_token_id) {
-					resolvedOutcome = market.right_outcome || 'No';
-				} else if (hasEnded) {
-					if (leftPrice >= 0.85) resolvedOutcome = market.left_outcome || 'Yes';
-					else if (rightPrice >= 0.85) resolvedOutcome = market.right_outcome || 'No';
-					else if (leftPrice > rightPrice && leftPrice >= 0.7) resolvedOutcome = market.left_outcome || 'Yes';
-					else if (rightPrice > leftPrice && rightPrice >= 0.7) resolvedOutcome = market.right_outcome || 'No';
+				if (market.resolved === true) {
+					if (market.winner_token_id === market.left_token_id) {
+						resolvedOutcome = market.left_outcome || 'Yes';
+					} else if (market.winner_token_id === market.right_token_id) {
+						resolvedOutcome = market.right_outcome || 'No';
+					}
 				}
 
 				markets.push({
@@ -80,7 +101,7 @@ export const GET: RequestHandler = async ({ url }) => {
 					image: market.image || item.image,
 					active: market.active,
 					closed: hasEnded,
-					resolved: resolvedOutcome != null,
+					resolved: market.resolved === true,
 					resolvedOutcome,
 					volume: parseFloat(market.volume || '0'),
 					volume_24hr: parseFloat(market.volume24hr || '0'),

@@ -159,85 +159,95 @@
 	<title>Marketplace - PolyMock</title>
 </svelte:head>
 
-<div class="marketplace-container">
-	<div class="header">
-		<h1>Strategy Marketplace</h1>
-		<p class="subtitle">Discover top-performing backtest strategies from the community</p>
+<div class="mp-page">
+
+	<!-- Header -->
+	<div class="mp-header">
+		<div class="mp-header-left">
+			<span class="mp-title">Marketplace</span>
+			<span class="mp-sub">{strategies.length} strateg{strategies.length !== 1 ? 'ies' : 'y'}</span>
+		</div>
+		<button class="mp-refresh" on:click={fetchStrategies} disabled={loading}>
+			{#if loading}<span class="mp-spin"></span>{/if}
+			{loading ? 'Loading…' : '↻ Refresh'}
+		</button>
 	</div>
 
 	{#if loading}
-		<div class="loading-state">
-			<div class="spinner"></div>
-			<p>Loading strategies...</p>
+		<div class="mp-loading">
+			<div class="mp-spin-lg"></div>
+			<span>Loading strategies…</span>
 		</div>
 	{:else if error}
-		<div class="error-state">
-			<p>Error loading strategies: {error}</p>
-			<button on:click={fetchStrategies}>Retry</button>
+		<div class="mp-empty">
+			<div class="mp-empty-icon">⚠</div>
+			<div class="mp-empty-title">Failed to load</div>
+			<div class="mp-empty-sub">{error}</div>
+			<button class="mp-cta" on:click={fetchStrategies}>Retry</button>
 		</div>
 	{:else if strategies.length === 0}
-		<div class="empty-state">
-			<p>No strategies available yet</p>
-			<p class="hint">Be the first to create and share a strategy!</p>
+		<div class="mp-empty">
+			<div class="mp-empty-icon">◎</div>
+			<div class="mp-empty-title">No strategies yet</div>
+			<div class="mp-empty-sub">Be the first to share a backtest strategy</div>
 		</div>
 	{:else}
-		<div class="strategies-list" in:fade={{ duration: 300 }}>
+		<div class="mp-table" in:fade={{ duration: 200 }}>
+			<!-- Table head -->
+			<div class="mp-row mp-row-head">
+				<span class="mp-col-rank">#</span>
+				<span class="mp-col-name">Strategy</span>
+				<span class="mp-col-spark">Curve</span>
+				<span class="mp-col-num">Return</span>
+				<span class="mp-col-num">Win Rate</span>
+				<span class="mp-col-num">Trades</span>
+				<span class="mp-col-num">Sharpe</span>
+				<span class="mp-col-num">Drawdown</span>
+				<span class="mp-col-action"></span>
+			</div>
+
 			{#each strategies as strategy, index (strategy.id)}
-				<div class="strategy-row" in:fade={{ duration: 300, delay: index * 30 }}>
-					<div class="rank-column">#{index + 1}</div>
+				<div class="mp-row mp-row-data" in:fade={{ duration: 200, delay: index * 20 }}>
+					<!-- Rank -->
+					<span class="mp-col-rank mp-rank">#{index + 1}</span>
 
-					<div class="name-column">
-						<div class="strategy-name">{strategy.strategyName}</div>
-						<div class="creator-name">by {strategy.userName || truncateAddress(strategy.walletAddress)}</div>
-					</div>
+					<!-- Name + creator -->
+					<span class="mp-col-name">
+						<span class="mp-sname">{strategy.strategyName}</span>
+						<span class="mp-creator">by {strategy.userName || truncateAddress(strategy.walletAddress)}</span>
+					</span>
 
-					<div class="chart-column">
+					<!-- Sparkline -->
+					<span class="mp-col-spark">
 						{#if strategy.equityCurve && strategy.equityCurve.length > 1}
 							{@const vals = strategy.equityCurve.map(p => p.equity ?? p.capital ?? 0)}
 							{@const min = Math.min(...vals)}
 							{@const max = Math.max(...vals)}
 							{@const range = max - min || 1}
-							{@const pts = vals.map((v, i) => `${(i/(vals.length-1))*120},${40-((v-min)/range)*36}`).join(' ')}
-							<svg viewBox="0 0 120 40" class="sparkline" preserveAspectRatio="none">
-								<polyline points={pts} fill="none" stroke={strategy.totalReturnPercent >= 0 ? '#10b981' : '#ef4444'} stroke-width="1.5"/>
+							{@const pts = vals.map((v, i) => `${(i/(vals.length-1))*100},${36-((v-min)/range)*32}`).join(' ')}
+							<svg viewBox="0 0 100 36" class="mp-spark" preserveAspectRatio="none">
+								<polyline points={pts} fill="none"
+									stroke={strategy.totalReturnPercent >= 0 ? '#10b981' : '#ef4444'}
+									stroke-width="1.5"/>
 							</svg>
 						{:else}
-							<div class="no-chart">No data</div>
+							<span class="mp-no-data">—</span>
 						{/if}
-					</div>
+					</span>
 
-					<div class="metric-column">
-						<div class="metric-label">RETURN</div>
-						<div class="metric-value" class:positive={strategy.totalReturnPercent >= 0} class:negative={strategy.totalReturnPercent < 0}>
-							{formatPercent(strategy.totalReturnPercent)}
-						</div>
-					</div>
+					<!-- Metrics -->
+					<span class="mp-col-num mp-mono" class:mp-pos={strategy.totalReturnPercent >= 0} class:mp-neg={strategy.totalReturnPercent < 0}>
+						{formatPercent(strategy.totalReturnPercent)}
+					</span>
+					<span class="mp-col-num mp-mono">{strategy.winRate.toFixed(1)}%</span>
+					<span class="mp-col-num mp-mono">{strategy.totalTrades}</span>
+					<span class="mp-col-num mp-mono">{strategy.sharpeRatio?.toFixed(2) || '—'}</span>
+					<span class="mp-col-num mp-mono mp-neg">{strategy.maxDrawdown?.toFixed(1) || '0'}%</span>
 
-					<div class="metric-column">
-						<div class="metric-label">WIN RATE</div>
-						<div class="metric-value">{strategy.winRate.toFixed(1)}%</div>
-					</div>
-
-					<div class="metric-column">
-						<div class="metric-label">TRADES</div>
-						<div class="metric-value">{strategy.totalTrades}</div>
-					</div>
-
-					<div class="metric-column">
-						<div class="metric-label">SHARPE</div>
-						<div class="metric-value">{strategy.sharpeRatio?.toFixed(2) || 'N/A'}</div>
-					</div>
-
-					<div class="metric-column">
-						<div class="metric-label">DRAWDOWN</div>
-						<div class="metric-value negative">{strategy.maxDrawdown?.toFixed(1) || '0'}%</div>
-					</div>
-
-					<div class="action-column">
-						<button class="view-details-btn" on:click={() => openStrategyDetails(strategy)}>
-							View Details
-						</button>
-					</div>
+					<!-- Action -->
+					<span class="mp-col-action">
+						<button class="mp-view-btn" on:click={() => openStrategyDetails(strategy)}>Details</button>
+					</span>
 				</div>
 			{/each}
 		</div>
@@ -247,532 +257,283 @@
 {#if selectedStrategy}
 	{@const br = buildBacktestResult(selectedStrategy)}
 	{@const sc = selectedStrategy.strategyConfig ?? {}}
-	<div class="modal-overlay" on:click={closeStrategyDetails} transition:fade={{ duration: 200 }}>
-		<div class="modal-content" on:click|stopPropagation>
-			<button class="modal-close" on:click={closeStrategyDetails}>×</button>
-
-			<h2 class="modal-title">{selectedStrategy.strategyName}</h2>
-			<div class="modal-creator">
-				by {selectedStrategy.userName || truncateAddress(selectedStrategy.walletAddress)}
-				{#if selectedStrategy.strategyType}
-					<span class="modal-type-badge">{selectedStrategy.strategyType}</span>
-				{/if}
+	<div class="mp-overlay" on:click={closeStrategyDetails} transition:fade={{ duration: 180 }}>
+		<div class="mp-modal" on:click|stopPropagation>
+			<div class="mp-modal-head">
+				<div>
+					<div class="mp-modal-title">{selectedStrategy.strategyName}</div>
+					<div class="mp-modal-creator">
+						by {selectedStrategy.userName || truncateAddress(selectedStrategy.walletAddress)}
+						{#if selectedStrategy.strategyType}
+							<span class="mp-type-badge">{selectedStrategy.strategyType}</span>
+						{/if}
+					</div>
+					{#if selectedStrategy.description}
+						<p class="mp-modal-desc">{selectedStrategy.description}</p>
+					{/if}
+				</div>
+				<button class="mp-modal-close" on:click={closeStrategyDetails}>×</button>
 			</div>
-			{#if selectedStrategy.description}
-				<p class="modal-description">{selectedStrategy.description}</p>
-			{/if}
 
-			<!-- TradingView equity curve chart -->
-			<div class="modal-chart">
+			<!-- Equity chart -->
+			<div class="mp-modal-chart">
 				<BacktestChart backtestResult={br} />
 			</div>
 
-			<!-- Key metrics -->
-			<div class="modal-stats-grid">
-				<div class="modal-stat">
-					<div class="modal-stat-label">Total Return</div>
-					<div class="modal-stat-value" class:positive={selectedStrategy.totalReturnPercent >= 0} class:negative={selectedStrategy.totalReturnPercent < 0}>
+			<!-- Key metrics grid -->
+			<div class="mp-mstats">
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Total Return</div>
+					<div class="mp-mstat-val" class:mp-pos={selectedStrategy.totalReturnPercent >= 0} class:mp-neg={selectedStrategy.totalReturnPercent < 0}>
 						{formatPercent(selectedStrategy.totalReturnPercent)}
 					</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Initial Capital</div>
-					<div class="modal-stat-value">{formatCurrency(selectedStrategy.initialCapital)}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Initial Capital</div>
+					<div class="mp-mstat-val">{formatCurrency(selectedStrategy.initialCapital)}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Final Capital</div>
-					<div class="modal-stat-value">{formatCurrency(selectedStrategy.finalCapital)}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Final Capital</div>
+					<div class="mp-mstat-val">{formatCurrency(selectedStrategy.finalCapital)}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Win Rate</div>
-					<div class="modal-stat-value">{selectedStrategy.winRate.toFixed(1)}%</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Win Rate</div>
+					<div class="mp-mstat-val">{selectedStrategy.winRate.toFixed(1)}%</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Total Trades</div>
-					<div class="modal-stat-value">{selectedStrategy.totalTrades}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Total Trades</div>
+					<div class="mp-mstat-val">{selectedStrategy.totalTrades}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Profit Factor</div>
-					<div class="modal-stat-value">{selectedStrategy.profitFactor?.toFixed(2) || 'N/A'}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Profit Factor</div>
+					<div class="mp-mstat-val">{selectedStrategy.profitFactor?.toFixed(2) || '—'}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Sharpe Ratio</div>
-					<div class="modal-stat-value">{selectedStrategy.sharpeRatio?.toFixed(2) || 'N/A'}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Sharpe Ratio</div>
+					<div class="mp-mstat-val">{selectedStrategy.sharpeRatio?.toFixed(2) || '—'}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Max Drawdown</div>
-					<div class="modal-stat-value negative">{selectedStrategy.maxDrawdown?.toFixed(2)}%</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Max Drawdown</div>
+					<div class="mp-mstat-val mp-neg">{selectedStrategy.maxDrawdown?.toFixed(2)}%</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Avg Win</div>
-					<div class="modal-stat-value positive">{formatCurrency(selectedStrategy.avgWin)}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Avg Win</div>
+					<div class="mp-mstat-val mp-pos">{formatCurrency(selectedStrategy.avgWin)}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Avg Loss</div>
-					<div class="modal-stat-value negative">{formatCurrency(selectedStrategy.avgLoss)}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Avg Loss</div>
+					<div class="mp-mstat-val mp-neg">{formatCurrency(selectedStrategy.avgLoss)}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Best Trade</div>
-					<div class="modal-stat-value positive">{formatCurrency(selectedStrategy.largestWin)}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Best Trade</div>
+					<div class="mp-mstat-val mp-pos">{formatCurrency(selectedStrategy.largestWin)}</div>
 				</div>
-				<div class="modal-stat">
-					<div class="modal-stat-label">Worst Trade</div>
-					<div class="modal-stat-value negative">{formatCurrency(selectedStrategy.largestLoss)}</div>
+				<div class="mp-mstat">
+					<div class="mp-mstat-label">Worst Trade</div>
+					<div class="mp-mstat-val mp-neg">{formatCurrency(selectedStrategy.largestLoss)}</div>
 				</div>
 			</div>
 
-			<!-- Strategy config params -->
+			<!-- Config params -->
 			{#if Object.keys(sc).length > 0}
-				<div class="modal-section">
-					<h3>Strategy Config</h3>
-					<div class="config-rows">
-						{#if sc.strategyType}<div class="cfg-row"><span class="cfg-label">Strategy</span><span class="cfg-val">{sc.strategyType}</span></div>{/if}
-						{#if sc.position}<div class="cfg-row"><span class="cfg-label">Side</span><span class="cfg-val">{sc.position}</span></div>{/if}
-						{#if sc.priceInf != null && sc.priceSup != null}<div class="cfg-row"><span class="cfg-label">Price Range</span><span class="cfg-val">{sc.priceInf} — {sc.priceSup}</span></div>{/if}
-						{#if sc.amount != null}<div class="cfg-row"><span class="cfg-label">Amount</span><span class="cfg-val">${sc.amount}</span></div>{/if}
-						{#if sc.threshold != null}<div class="cfg-row"><span class="cfg-label">Threshold</span><span class="cfg-val">{sc.threshold}</span></div>{/if}
-						{#if sc.stopLoss != null}<div class="cfg-row"><span class="cfg-label">Stop Loss</span><span class="cfg-val negative">{(n(sc.stopLoss)*100).toFixed(0)}%</span></div>{/if}
-						{#if sc.takeProfit != null}<div class="cfg-row"><span class="cfg-label">Take Profit</span><span class="cfg-val positive">{(n(sc.takeProfit)*100).toFixed(0)}%</span></div>{/if}
-						{#if sc.trailingStop != null}<div class="cfg-row"><span class="cfg-label">Trailing Stop</span><span class="cfg-val">{(n(sc.trailingStop)*100).toFixed(0)}%</span></div>{/if}
-						{#if sc.maxHoldHours != null}<div class="cfg-row"><span class="cfg-label">Max Hold</span><span class="cfg-val">{sc.maxHoldHours}h</span></div>{/if}
-						{#if sc.cooldownHours != null}<div class="cfg-row"><span class="cfg-label">Cooldown</span><span class="cfg-val">{sc.cooldownHours}h</span></div>{/if}
-						{#if sc.initialCash != null}<div class="cfg-row"><span class="cfg-label">Starting Cash</span><span class="cfg-val">${n(sc.initialCash).toLocaleString()}</span></div>{/if}
+				<div class="mp-section">
+					<div class="mp-section-title">Strategy Config</div>
+					<div class="mp-cfg">
+						{#if sc.strategyType}<div class="mp-cfg-row"><span class="mp-cfg-k">Strategy</span><span class="mp-cfg-v">{sc.strategyType}</span></div>{/if}
+						{#if sc.position}<div class="mp-cfg-row"><span class="mp-cfg-k">Side</span><span class="mp-cfg-v">{sc.position}</span></div>{/if}
+						{#if sc.priceInf != null && sc.priceSup != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Price Range</span><span class="mp-cfg-v">{sc.priceInf} — {sc.priceSup}</span></div>{/if}
+						{#if sc.amount != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Amount</span><span class="mp-cfg-v">${sc.amount}</span></div>{/if}
+						{#if sc.threshold != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Threshold</span><span class="mp-cfg-v">{sc.threshold}</span></div>{/if}
+						{#if sc.stopLoss != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Stop Loss</span><span class="mp-cfg-v mp-neg">{(n(sc.stopLoss)*100).toFixed(0)}%</span></div>{/if}
+						{#if sc.takeProfit != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Take Profit</span><span class="mp-cfg-v mp-pos">{(n(sc.takeProfit)*100).toFixed(0)}%</span></div>{/if}
+						{#if sc.trailingStop != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Trailing Stop</span><span class="mp-cfg-v">{(n(sc.trailingStop)*100).toFixed(0)}%</span></div>{/if}
+						{#if sc.maxHoldHours != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Max Hold</span><span class="mp-cfg-v">{sc.maxHoldHours}h</span></div>{/if}
+						{#if sc.cooldownHours != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Cooldown</span><span class="mp-cfg-v">{sc.cooldownHours}h</span></div>{/if}
+						{#if sc.initialCash != null}<div class="mp-cfg-row"><span class="mp-cfg-k">Starting Cash</span><span class="mp-cfg-v">${n(sc.initialCash).toLocaleString()}</span></div>{/if}
 					</div>
 				</div>
 			{/if}
 
-			<div class="modal-section">
-				<h3>Period</h3>
-				<p>{formatDate(selectedStrategy.startDate)} — {formatDate(selectedStrategy.endDate)}</p>
+			<div class="mp-section">
+				<div class="mp-section-title">Period</div>
+				<div class="mp-period">{formatDate(selectedStrategy.startDate)} — {formatDate(selectedStrategy.endDate)}</div>
 			</div>
 		</div>
 	</div>
 {/if}
 
 <style>
-	.marketplace-container {
-		max-width: 1400px;
-		margin: 0 auto;
-		padding: 40px 20px;
-		background: #0A0A0A;
-		min-height: 100vh;
+	/* ── PAGE ── */
+	.mp-page {
+		min-height: 100vh; background: #000; color: #e8e8e8;
+		padding: 20px 24px 40px; max-width: 1440px; margin: 0 auto;
 	}
 
-	.header {
-		text-align: center;
-		margin-bottom: 50px;
+	/* ── HEADER ── */
+	.mp-header {
+		display: flex; align-items: center; justify-content: space-between;
+		padding-bottom: 20px; border-bottom: 1px solid #111; margin-bottom: 20px;
 	}
-
-	.header h1 {
-		font-size: 42px;
-		font-weight: 700;
-		color: #E8E8E8;
-		margin: 0 0 10px 0;
+	.mp-header-left { display: flex; align-items: baseline; gap: 10px; }
+	.mp-title { font-size: 18px; font-weight: 700; color: #e8e8e8; letter-spacing: -0.02em; }
+	.mp-sub { font-size: 12px; color: #e8e8e8; }
+	.mp-refresh {
+		display: flex; align-items: center; gap: 6px;
+		background: transparent; border: 1px solid #1e1e1e;
+		color: #e8e8e8; font-size: 12px; font-weight: 600;
+		padding: 6px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s;
 	}
-
-	.subtitle {
-		font-size: 18px;
-		color: #888;
-		margin: 0;
+	.mp-refresh:hover:not(:disabled) { border-color: #F97316; color: #F97316; }
+	.mp-refresh:disabled { opacity: 0.4; cursor: not-allowed; }
+	.mp-spin {
+		width: 11px; height: 11px; border: 2px solid #333; border-top-color: #F97316;
+		border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
 	}
+	@keyframes spin { to { transform: rotate(360deg); } }
 
-	.loading-state,
-	.error-state,
-	.empty-state {
-		text-align: center;
-		padding: 80px 20px;
-		color: #888;
+	/* ── EMPTY / LOADING ── */
+	.mp-loading {
+		display: flex; align-items: center; gap: 10px; justify-content: center;
+		padding: 80px 20px; color: #e8e8e8; font-size: 13px;
 	}
-
-	.spinner {
-		width: 50px;
-		height: 50px;
-		border: 4px solid rgba(249, 115, 22, 0.1);
-		border-top: 4px solid #F97316;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-		margin: 0 auto 20px;
+	.mp-spin-lg {
+		width: 18px; height: 18px; border: 2px solid #1a1a1a; border-top-color: #F97316;
+		border-radius: 50%; animation: spin 0.7s linear infinite;
 	}
-
-	@keyframes spin {
-		0% { transform: rotate(0deg); }
-		100% { transform: rotate(360deg); }
+	.mp-empty {
+		display: flex; flex-direction: column; align-items: center;
+		padding: 80px 20px; gap: 8px;
 	}
-
-	.error-state button {
-		margin-top: 20px;
-		padding: 10px 24px;
-		background: #F97316;
-		color: #0A0A0A;
-		border: none;
-		border-radius: 8px;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s;
+	.mp-empty-icon { font-size: 30px; color: #e8e8e8; margin-bottom: 4px; }
+	.mp-empty-title { font-size: 15px; font-weight: 700; color: #e8e8e8; }
+	.mp-empty-sub { font-size: 12px; color: #e8e8e8; margin-bottom: 8px; }
+	.mp-cta {
+		padding: 9px 20px; background: #F97316; color: #000;
+		border: none; border-radius: 7px; font-size: 13px; font-weight: 700;
+		cursor: pointer; transition: background 0.15s;
 	}
+	.mp-cta:hover { background: #ea580c; }
 
-	.error-state button:hover {
-		background: #EA580C;
+	/* ── TABLE ── */
+	.mp-table {
+		border: 1px solid #1e1e1e; border-radius: 8px; overflow: hidden;
 	}
-
-	.strategies-list {
-		display: flex;
-		flex-direction: column;
-		gap: 1px;
-		background: #2a2a2a;
-		border-radius: 8px;
-		overflow: hidden;
-	}
-
-	.strategy-row {
+	.mp-row {
 		display: grid;
-		grid-template-columns: 60px 250px 200px repeat(5, 1fr) 140px;
-		gap: 16px;
-		align-items: center;
-		background: #000000;
-		padding: 16px 20px;
-		transition: all 0.2s ease;
-		border-left: 3px solid transparent;
-	}
-
-	.strategy-row:hover {
-		background: rgba(249, 115, 22, 0.05);
-		border-left-color: #F97316;
-	}
-
-	.rank-column {
-		font-size: 18px;
-		font-weight: 700;
-		color: #F97316;
-		font-family: monospace;
-		text-align: center;
-	}
-
-	.name-column {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		min-width: 0;
-	}
-
-	.strategy-name {
-		font-size: 14px;
-		font-weight: 600;
-		color: #E8E8E8;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.creator-name {
-		font-size: 11px;
-		color: #6B7280;
-		font-family: monospace;
-	}
-
-	.chart-column {
-		height: 40px;
-		display: flex;
-		align-items: center;
-	}
-
-	.no-chart {
-		font-size: 11px;
-		color: #6B7280;
-		font-style: italic;
-	}
-
-	.metric-column {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		align-items: center;
-		text-align: center;
-	}
-
-	.metric-label {
-		font-size: 10px;
-		color: #6B7280;
-		font-weight: 600;
-		letter-spacing: 0.5px;
-		font-family: monospace;
-	}
-
-	.metric-value {
-		font-size: 14px;
-		font-weight: 700;
-		color: #E8E8E8;
-		font-family: monospace;
-	}
-
-	.metric-value.positive {
-		color: #10B981;
-	}
-
-	.metric-value.negative {
-		color: #EF4444;
-	}
-
-	.action-column {
-		display: flex;
-		justify-content: flex-end;
-	}
-
-	.view-details-btn {
-		padding: 8px 16px;
-		background: transparent;
-		border: 1px solid #F97316;
-		color: #F97316;
-		border-radius: 4px;
-		font-weight: 600;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.view-details-btn:hover {
-		background: #F97316;
-		color: #000000;
-	}
-
-	.modal-overlay {
-		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.8);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 1000;
-		padding: 20px;
-	}
-
-	.modal-content {
-		background: #111;
-		border: 1px solid #222;
-		border-radius: 16px;
-		padding: 28px 32px;
-		max-width: 720px;
-		width: 100%;
-		max-height: 80vh;
-		overflow-y: auto;
-		overflow-x: hidden;
-		position: relative;
-		scrollbar-width: thin;
-		scrollbar-color: #333 transparent;
-	}
-
-	.modal-close {
-		position: absolute;
-		top: 20px;
-		right: 20px;
-		background: transparent;
-		border: none;
-		color: #888;
-		font-size: 32px;
-		cursor: pointer;
-		line-height: 1;
-		padding: 0;
-		width: 32px;
-		height: 32px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.modal-close:hover {
-		color: #E8E8E8;
-	}
-
-	.modal-title {
-		font-size: 28px;
-		font-weight: 700;
-		color: #E8E8E8;
-		margin: 0 0 10px 0;
-	}
-
-	.sparkline {
-		width: 100%;
-		height: 40px;
-		display: block;
-	}
-
-	.modal-chart {
-		margin: 16px 0;
-		border-radius: 8px;
-		overflow: hidden;
-		border: 1px solid #1a1a1a;
-		max-height: 340px;
-		overflow-y: auto;
-	}
-
-	.config-rows {
-		display: flex;
-		flex-direction: column;
-		gap: 4px;
-		background: #0a0a0a;
-		border-radius: 8px;
-		padding: 12px 16px;
-		border: 1px solid #1a1a1a;
-	}
-
-	.cfg-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 6px 0;
+		grid-template-columns: 44px minmax(200px,1fr) 110px repeat(5, 90px) 80px;
+		align-items: center; gap: 10px; padding: 0 18px;
 		border-bottom: 1px solid #111;
-		font-size: 13px;
+	}
+	.mp-row:last-child { border-bottom: none; }
+	.mp-row-head {
+		padding-top: 11px; padding-bottom: 11px;
+		background: #080808; border-bottom: 1px solid #1e1e1e;
+	}
+	.mp-row-head span {
+		font-size: 9.5px; font-weight: 800; color: #e8e8e8;
+		text-transform: uppercase; letter-spacing: 0.09em;
+	}
+	.mp-row-data {
+		padding-top: 14px; padding-bottom: 14px;
+		background: #000; transition: background 0.1s;
+	}
+	.mp-row-data:hover { background: rgba(249,115,22,0.04); }
+
+	/* ── COLUMNS ── */
+	.mp-col-rank { text-align: center; }
+	.mp-col-name { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+	.mp-col-spark { display: flex; align-items: center; }
+	.mp-col-num { text-align: right; }
+	.mp-col-action { display: flex; justify-content: flex-end; }
+
+	.mp-rank { font-size: 13px; font-weight: 800; color: #F97316; font-family: monospace; }
+	.mp-sname {
+		font-size: 13px; font-weight: 600; color: #e8e8e8;
+		white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+	}
+	.mp-creator { font-size: 11px; color: #e8e8e8; font-family: monospace; }
+	.mp-spark { width: 100%; height: 36px; display: block; }
+	.mp-no-data { font-size: 11px; color: #e8e8e8; }
+	.mp-mono { font-family: 'SF Mono','Fira Code',monospace; font-size: 12.5px; color: #e8e8e8; font-weight: 600; }
+	.mp-pos { color: #10b981 !important; }
+	.mp-neg { color: #ef4444 !important; }
+
+	.mp-view-btn {
+		background: transparent; border: 1px solid #2a2a2a;
+		color: #e8e8e8; font-size: 11px; font-weight: 700;
+		padding: 5px 12px; border-radius: 5px; cursor: pointer;
+		transition: all 0.15s; letter-spacing: 0.02em; white-space: nowrap;
+	}
+	.mp-view-btn:hover { border-color: #F97316; color: #F97316; background: rgba(249,115,22,0.05); }
+
+	/* ── MODAL ── */
+	.mp-overlay {
+		position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+		backdrop-filter: blur(8px); display: flex; align-items: center;
+		justify-content: center; z-index: 1000; padding: 20px;
+	}
+	.mp-modal {
+		background: #080808; border: 1px solid #1e1e1e; border-radius: 12px;
+		padding: 28px 28px 24px; max-width: 740px; width: 100%;
+		max-height: 85vh; overflow-y: auto; overflow-x: hidden; position: relative;
+		scrollbar-width: thin; scrollbar-color: #222 transparent;
+	}
+	.mp-modal-head {
+		display: flex; justify-content: space-between; align-items: flex-start;
+		gap: 12px; margin-bottom: 16px;
+	}
+	.mp-modal-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 5px; }
+	.mp-modal-creator { font-size: 12px; color: #e8e8e8; display: flex; align-items: center; gap: 8px; }
+	.mp-modal-desc { font-size: 13px; color: #ccc; line-height: 1.6; margin: 8px 0 0; }
+	.mp-type-badge {
+		font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 3px;
+		background: rgba(249,115,22,0.1); border: 1px solid rgba(249,115,22,0.3); color: #F97316;
+		text-transform: uppercase; letter-spacing: 0.05em;
+	}
+	.mp-modal-close {
+		background: transparent; border: none; color: #e8e8e8;
+		font-size: 28px; cursor: pointer; line-height: 1; padding: 0; flex-shrink: 0;
+		transition: color 0.15s;
+	}
+	.mp-modal-close:hover { color: #e8e8e8; }
+	.mp-modal-chart {
+		border: 1px solid #1a1a1a; border-radius: 8px; overflow: hidden;
+		max-height: 320px; overflow-y: auto; margin-bottom: 20px;
 	}
 
-	.cfg-row:last-child { border-bottom: none; }
-
-	.cfg-label {
-		color: #666;
-		font-family: monospace;
+	/* Modal metrics */
+	.mp-mstats {
+		display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px;
 	}
-
-	.cfg-val {
-		color: #e8e8e8;
-		font-weight: 600;
-		font-family: monospace;
+	.mp-mstat {
+		background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 6px; padding: 12px 14px;
 	}
+	.mp-mstat-label { font-size: 9.5px; color: #e8e8e8; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 5px; }
+	.mp-mstat-val { font-size: 15px; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
 
-	.cfg-val.positive { color: #10b981; }
-	.cfg-val.negative { color: #ef4444; }
-
-	.modal-creator {
-		color: #888;
-		margin-bottom: 12px;
-		display: flex;
-		align-items: center;
-		gap: 8px;
+	/* Config */
+	.mp-section { margin-bottom: 18px; }
+	.mp-section-title { font-size: 11px; font-weight: 700; color: #e8e8e8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+	.mp-cfg {
+		background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 6px; padding: 2px 14px;
 	}
-
-	.modal-type-badge {
-		font-size: 11px;
-		font-weight: 600;
-		padding: 2px 8px;
-		border-radius: 4px;
-		background: rgba(249, 115, 22, 0.1);
-		border: 1px solid rgba(249, 115, 22, 0.3);
-		color: #F97316;
-		text-transform: uppercase;
+	.mp-cfg-row {
+		display: flex; justify-content: space-between; align-items: center;
+		padding: 8px 0; border-bottom: 1px solid #111; font-size: 12.5px;
 	}
+	.mp-cfg-row:last-child { border-bottom: none; }
+	.mp-cfg-k { color: #e8e8e8; font-family: monospace; }
+	.mp-cfg-v { color: #e8e8e8; font-weight: 600; font-family: monospace; }
+	.mp-period { font-size: 13px; color: #e8e8e8; }
 
-	.modal-description {
-		color: #9ca3af;
-		font-size: 14px;
-		line-height: 1.6;
-		margin: 0 0 24px;
+	/* ── RESPONSIVE ── */
+	@media (max-width: 1100px) {
+		.mp-row { grid-template-columns: 40px minmax(160px,1fr) 90px repeat(5, 78px) 72px; }
 	}
-
-	.modal-stats-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 16px;
-		margin-bottom: 30px;
-	}
-
-	.modal-stat {
-		background: #0A0A0A;
-		padding: 16px;
-		border-radius: 8px;
-	}
-
-	.modal-stat-label {
-		font-size: 12px;
-		color: #888;
-		margin-bottom: 8px;
-	}
-
-	.modal-stat-value {
-		font-size: 18px;
-		font-weight: 700;
-		color: #E8E8E8;
-	}
-
-	.modal-stat-value.positive {
-		color: #10B981;
-	}
-
-	.modal-stat-value.negative {
-		color: #FF4444;
-	}
-
-	.modal-section {
-		margin-bottom: 30px;
-	}
-
-	.modal-section h3 {
-		font-size: 18px;
-		font-weight: 700;
-		color: #E8E8E8;
-		margin: 0 0 12px 0;
-	}
-
-	.modal-section p {
-		color: #888;
-		margin: 0;
-	}
-
-	.market-ids {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 8px;
-	}
-
-	.market-id-chip {
-		background: #0A0A0A;
-		border: 1px solid #222;
-		padding: 6px 12px;
-		border-radius: 6px;
-		font-size: 12px;
-		color: #888;
-		font-family: 'Courier New', monospace;
-	}
-
-	.modal-actions {
-		display: flex;
-		gap: 12px;
-		margin-top: 30px;
-	}
-
-	.paper-trade-btn {
-		flex: 1;
-		padding: 16px;
-		background: #F97316;
-		color: #0A0A0A;
-		border: none;
-		border-radius: 8px;
-		font-weight: 700;
-		font-size: 16px;
-		cursor: pointer;
-		transition: all 0.2s;
-	}
-
-	.paper-trade-btn:disabled {
-		background: #222;
-		color: #555;
-		cursor: not-allowed;
-	}
-
-	.paper-trade-btn:not(:disabled):hover {
-		background: #EA580C;
-	}
-
 	@media (max-width: 768px) {
-		.strategies-grid {
-			grid-template-columns: 1fr;
-		}
-
-		.modal-content {
-			padding: 30px 20px;
-		}
-
-		.modal-stats-grid {
-			grid-template-columns: repeat(2, 1fr);
-		}
+		.mp-page { padding: 14px 14px 40px; }
+		.mp-table { overflow-x: auto; }
+		.mp-row { min-width: 780px; }
+		.mp-mstats { grid-template-columns: repeat(2, 1fr); }
 	}
 </style>

@@ -54,7 +54,7 @@
 	const availableCategories = [
 		'crypto', 'culture', 'economy', 'elections', 'finance',
 		'geopolitics', 'politics', 'sports', 'tech', 'world',
-		'science', 'entertainment', 'health', 'weather'
+		'science', 'entertainment', 'health'
 	];
 
 	async function fetchMarketsByCategory(term: any) {
