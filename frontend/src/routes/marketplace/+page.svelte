@@ -1,16 +1,17 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, onDestroy } from 'svelte';
 	import { fade } from 'svelte/transition';
-	import MiniEquityCurveChart from '$lib/components/MiniEquityCurveChart.svelte';
+	import BacktestChart from '$lib/components/backtesting/BacktestChart.svelte';
 
 	interface Strategy {
-		id: number;
-		userId: number;
+		id: string;
+		userId: string;
 		strategyName: string;
-		userName: string;
+		userName: string | null;
 		walletAddress: string;
 		marketIds: string[];
-		marketQuestion: string;
+		description: string | null;
+		strategyType: string | null;
 		initialCapital: number;
 		finalCapital: number;
 		totalReturnPercent: number;
@@ -27,8 +28,11 @@
 		largestLoss: number;
 		startDate: string;
 		endDate: string;
-		equityCurve: Array<{timestamp: number, value: number}>;
+		equityCurve: Array<{ timestamp: string; equity?: number; capital?: number }>;
+		likesCount: number;
+		commentsCount: number;
 		createdAt: string;
+		strategyConfig: any | null;
 	}
 
 	let strategies: Strategy[] = [];
@@ -49,9 +53,8 @@
 				throw new Error('Failed to fetch strategies');
 			}
 			const data = await response.json();
-			strategies = data.strategies;
-			console.log('[Marketplace] Fetched strategies:', strategies.length);
-			console.log('[Marketplace] First strategy equity curve:', strategies[0]?.equityCurve);
+			strategies = Array.isArray(data.strategies) ? data.strategies : [];
+			console.log('[Marketplace] Fetched strategies:', strategies.length, data);
 		} catch (err: any) {
 			console.error('Error fetching marketplace strategies:', err);
 			error = err.message;
@@ -87,11 +90,69 @@
 
 	function openStrategyDetails(strategy: Strategy) {
 		selectedStrategy = strategy;
+		if (typeof document !== 'undefined') document.body.style.overflow = 'hidden';
 	}
 
 	function closeStrategyDetails() {
 		selectedStrategy = null;
+		if (typeof document !== 'undefined') document.body.style.overflow = '';
 	}
+
+	onDestroy(() => {
+		if (typeof document !== 'undefined') document.body.style.overflow = '';
+	});
+
+	function n(v: any): number { return typeof v === 'number' && !isNaN(v) ? v : 0; }
+
+	function buildBacktestResult(s: Strategy) {
+		const pnl = (s.finalCapital ?? 0) - (s.initialCapital ?? 0);
+		return {
+			trades: [],
+			metrics: {
+				totalTrades: n(s.totalTrades),
+				winningTrades: n(s.winningTrades),
+				losingTrades: n(s.losingTrades),
+				winRate: n(s.winRate),
+				profitFactor: n(s.profitFactor),
+				sharpeRatio: n(s.sharpeRatio),
+				maxDrawdown: n(s.maxDrawdown),
+				maxDrawdownPercentage: n(s.maxDrawdown),
+				avgWin: n(s.avgWin),
+				avgLoss: n(s.avgLoss),
+				bestTrade: n(s.largestWin),
+				worstTrade: n(s.largestLoss),
+				roi: n(s.totalReturnPercent),
+				totalPnl: pnl,
+				netPnl: pnl,
+				equityCurve: s.equityCurve ?? [],
+				// required by BacktestMetrics but not stored separately
+				volatility: 0,
+				expectancy: 0,
+				medianWin: 0,
+				medianLoss: 0,
+				avgHoldTime: 0,
+				medianHoldTime: 0,
+				capitalUtilization: 0,
+				avgCapitalAllocation: 0,
+				consecutiveWins: 0,
+				consecutiveLosses: 0,
+				longestWinStreak: 0,
+				longestLossStreak: 0,
+				dailyPnl: [],
+				drawdownCurve: [],
+				capitalUtilizationOverTime: [],
+				marketBreakdown: {},
+				exitReasonDistribution: { resolution: 0, stopLoss: 0, takeProfit: 0, maxHoldTime: 0, trailingStop: 0, partialExits: 0 },
+				longShortBreakdown: { long: { trades: 0, winRate: 0, avgReturn: 0, pnl: 0, avgWin: 0, avgLoss: 0 }, short: { trades: 0, winRate: 0, avgReturn: 0, pnl: 0, avgWin: 0, avgLoss: 0 } },
+			},
+			startingCapital: n(s.initialCapital),
+			endingCapital: n(s.finalCapital),
+			marketsAnalyzed: s.marketIds?.length ?? 0,
+			executionTime: 0,
+			strategyConfig: s.strategyConfig ?? null,
+		};
+	}
+
 </script>
 
 <svelte:head>
@@ -131,12 +192,15 @@
 					</div>
 
 					<div class="chart-column">
-						{#if strategy.equityCurve && strategy.equityCurve.length > 0}
-							<MiniEquityCurveChart
-								equityCurve={strategy.equityCurve}
-								initialCapital={strategy.initialCapital}
-								isPositive={strategy.totalReturnPercent >= 0}
-							/>
+						{#if strategy.equityCurve && strategy.equityCurve.length > 1}
+							{@const vals = strategy.equityCurve.map(p => p.equity ?? p.capital ?? 0)}
+							{@const min = Math.min(...vals)}
+							{@const max = Math.max(...vals)}
+							{@const range = max - min || 1}
+							{@const pts = vals.map((v, i) => `${(i/(vals.length-1))*120},${40-((v-min)/range)*36}`).join(' ')}
+							<svg viewBox="0 0 120 40" class="sparkline" preserveAspectRatio="none">
+								<polyline points={pts} fill="none" stroke={strategy.totalReturnPercent >= 0 ? '#10b981' : '#ef4444'} stroke-width="1.5"/>
+							</svg>
 						{:else}
 							<div class="no-chart">No data</div>
 						{/if}
@@ -181,15 +245,29 @@
 </div>
 
 {#if selectedStrategy}
+	{@const br = buildBacktestResult(selectedStrategy)}
+	{@const sc = selectedStrategy.strategyConfig ?? {}}
 	<div class="modal-overlay" on:click={closeStrategyDetails} transition:fade={{ duration: 200 }}>
 		<div class="modal-content" on:click|stopPropagation>
 			<button class="modal-close" on:click={closeStrategyDetails}>×</button>
 
 			<h2 class="modal-title">{selectedStrategy.strategyName}</h2>
 			<div class="modal-creator">
-				Created by {selectedStrategy.userName || truncateAddress(selectedStrategy.walletAddress)}
+				by {selectedStrategy.userName || truncateAddress(selectedStrategy.walletAddress)}
+				{#if selectedStrategy.strategyType}
+					<span class="modal-type-badge">{selectedStrategy.strategyType}</span>
+				{/if}
+			</div>
+			{#if selectedStrategy.description}
+				<p class="modal-description">{selectedStrategy.description}</p>
+			{/if}
+
+			<!-- TradingView equity curve chart -->
+			<div class="modal-chart">
+				<BacktestChart backtestResult={br} />
 			</div>
 
+			<!-- Key metrics -->
 			<div class="modal-stats-grid">
 				<div class="modal-stat">
 					<div class="modal-stat-label">Total Return</div>
@@ -206,12 +284,12 @@
 					<div class="modal-stat-value">{formatCurrency(selectedStrategy.finalCapital)}</div>
 				</div>
 				<div class="modal-stat">
-					<div class="modal-stat-label">Total Trades</div>
-					<div class="modal-stat-value">{selectedStrategy.totalTrades}</div>
-				</div>
-				<div class="modal-stat">
 					<div class="modal-stat-label">Win Rate</div>
 					<div class="modal-stat-value">{selectedStrategy.winRate.toFixed(1)}%</div>
+				</div>
+				<div class="modal-stat">
+					<div class="modal-stat-label">Total Trades</div>
+					<div class="modal-stat-value">{selectedStrategy.totalTrades}</div>
 				</div>
 				<div class="modal-stat">
 					<div class="modal-stat-label">Profit Factor</div>
@@ -223,44 +301,49 @@
 				</div>
 				<div class="modal-stat">
 					<div class="modal-stat-label">Max Drawdown</div>
-					<div class="modal-stat-value">{selectedStrategy.maxDrawdown?.toFixed(2)}%</div>
+					<div class="modal-stat-value negative">{selectedStrategy.maxDrawdown?.toFixed(2)}%</div>
 				</div>
 				<div class="modal-stat">
 					<div class="modal-stat-label">Avg Win</div>
-					<div class="modal-stat-value">{formatCurrency(selectedStrategy.avgWin)}</div>
+					<div class="modal-stat-value positive">{formatCurrency(selectedStrategy.avgWin)}</div>
 				</div>
 				<div class="modal-stat">
 					<div class="modal-stat-label">Avg Loss</div>
-					<div class="modal-stat-value">{formatCurrency(selectedStrategy.avgLoss)}</div>
+					<div class="modal-stat-value negative">{formatCurrency(selectedStrategy.avgLoss)}</div>
 				</div>
 				<div class="modal-stat">
-					<div class="modal-stat-label">Largest Win</div>
-					<div class="modal-stat-value">{formatCurrency(selectedStrategy.largestWin)}</div>
+					<div class="modal-stat-label">Best Trade</div>
+					<div class="modal-stat-value positive">{formatCurrency(selectedStrategy.largestWin)}</div>
 				</div>
 				<div class="modal-stat">
-					<div class="modal-stat-label">Largest Loss</div>
-					<div class="modal-stat-value">{formatCurrency(selectedStrategy.largestLoss)}</div>
+					<div class="modal-stat-label">Worst Trade</div>
+					<div class="modal-stat-value negative">{formatCurrency(selectedStrategy.largestLoss)}</div>
 				</div>
 			</div>
+
+			<!-- Strategy config params -->
+			{#if Object.keys(sc).length > 0}
+				<div class="modal-section">
+					<h3>Strategy Config</h3>
+					<div class="config-rows">
+						{#if sc.strategyType}<div class="cfg-row"><span class="cfg-label">Strategy</span><span class="cfg-val">{sc.strategyType}</span></div>{/if}
+						{#if sc.position}<div class="cfg-row"><span class="cfg-label">Side</span><span class="cfg-val">{sc.position}</span></div>{/if}
+						{#if sc.priceInf != null && sc.priceSup != null}<div class="cfg-row"><span class="cfg-label">Price Range</span><span class="cfg-val">{sc.priceInf} — {sc.priceSup}</span></div>{/if}
+						{#if sc.amount != null}<div class="cfg-row"><span class="cfg-label">Amount</span><span class="cfg-val">${sc.amount}</span></div>{/if}
+						{#if sc.threshold != null}<div class="cfg-row"><span class="cfg-label">Threshold</span><span class="cfg-val">{sc.threshold}</span></div>{/if}
+						{#if sc.stopLoss != null}<div class="cfg-row"><span class="cfg-label">Stop Loss</span><span class="cfg-val negative">{(n(sc.stopLoss)*100).toFixed(0)}%</span></div>{/if}
+						{#if sc.takeProfit != null}<div class="cfg-row"><span class="cfg-label">Take Profit</span><span class="cfg-val positive">{(n(sc.takeProfit)*100).toFixed(0)}%</span></div>{/if}
+						{#if sc.trailingStop != null}<div class="cfg-row"><span class="cfg-label">Trailing Stop</span><span class="cfg-val">{(n(sc.trailingStop)*100).toFixed(0)}%</span></div>{/if}
+						{#if sc.maxHoldHours != null}<div class="cfg-row"><span class="cfg-label">Max Hold</span><span class="cfg-val">{sc.maxHoldHours}h</span></div>{/if}
+						{#if sc.cooldownHours != null}<div class="cfg-row"><span class="cfg-label">Cooldown</span><span class="cfg-val">{sc.cooldownHours}h</span></div>{/if}
+						{#if sc.initialCash != null}<div class="cfg-row"><span class="cfg-label">Starting Cash</span><span class="cfg-val">${n(sc.initialCash).toLocaleString()}</span></div>{/if}
+					</div>
+				</div>
+			{/if}
 
 			<div class="modal-section">
 				<h3>Period</h3>
-				<p>{formatDate(selectedStrategy.startDate)} - {formatDate(selectedStrategy.endDate)}</p>
-			</div>
-
-			<div class="modal-section">
-				<h3>Markets ({selectedStrategy.marketIds.length})</h3>
-				<div class="market-ids">
-					{#each selectedStrategy.marketIds as marketId}
-						<div class="market-id-chip">{marketId.slice(0, 8)}...</div>
-					{/each}
-				</div>
-			</div>
-
-			<div class="modal-actions">
-				<button class="paper-trade-btn" disabled>
-					Paper Trade (Coming Soon)
-				</button>
+				<p>{formatDate(selectedStrategy.startDate)} — {formatDate(selectedStrategy.endDate)}</p>
 			</div>
 		</div>
 	</div>
@@ -469,12 +552,15 @@
 		background: #111;
 		border: 1px solid #222;
 		border-radius: 16px;
-		padding: 40px;
-		max-width: 800px;
+		padding: 28px 32px;
+		max-width: 720px;
 		width: 100%;
-		max-height: 90vh;
+		max-height: 80vh;
 		overflow-y: auto;
+		overflow-x: hidden;
 		position: relative;
+		scrollbar-width: thin;
+		scrollbar-color: #333 transparent;
 	}
 
 	.modal-close {
@@ -506,9 +592,80 @@
 		margin: 0 0 10px 0;
 	}
 
+	.sparkline {
+		width: 100%;
+		height: 40px;
+		display: block;
+	}
+
+	.modal-chart {
+		margin: 16px 0;
+		border-radius: 8px;
+		overflow: hidden;
+		border: 1px solid #1a1a1a;
+		max-height: 340px;
+		overflow-y: auto;
+	}
+
+	.config-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		background: #0a0a0a;
+		border-radius: 8px;
+		padding: 12px 16px;
+		border: 1px solid #1a1a1a;
+	}
+
+	.cfg-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 6px 0;
+		border-bottom: 1px solid #111;
+		font-size: 13px;
+	}
+
+	.cfg-row:last-child { border-bottom: none; }
+
+	.cfg-label {
+		color: #666;
+		font-family: monospace;
+	}
+
+	.cfg-val {
+		color: #e8e8e8;
+		font-weight: 600;
+		font-family: monospace;
+	}
+
+	.cfg-val.positive { color: #10b981; }
+	.cfg-val.negative { color: #ef4444; }
+
 	.modal-creator {
 		color: #888;
-		margin-bottom: 30px;
+		margin-bottom: 12px;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.modal-type-badge {
+		font-size: 11px;
+		font-weight: 600;
+		padding: 2px 8px;
+		border-radius: 4px;
+		background: rgba(249, 115, 22, 0.1);
+		border: 1px solid rgba(249, 115, 22, 0.3);
+		color: #F97316;
+		text-transform: uppercase;
+	}
+
+	.modal-description {
+		color: #9ca3af;
+		font-size: 14px;
+		line-height: 1.6;
+		margin: 0 0 24px;
 	}
 
 	.modal-stats-grid {
