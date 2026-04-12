@@ -679,7 +679,7 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
             <span className={`text-[10px] font-semibold ${marketColors[trade.marketType]?.replace("border ", "").split(" ").slice(0, 2).join(" ")}`}>
               {trade.marketType.toUpperCase()}
             </span>
-            {trade.comment && <span className="truncate max-w-[200px] text-gray-400 italic">&ldquo;{trade.comment}&rdquo;</span>}
+            {trade.comment && <span className="truncate max-w-[200px] text-white italic">&ldquo;{trade.comment}&rdquo;</span>}
           </div>
         </div>
 
@@ -817,7 +817,7 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
                 {/* Description / Comment */}
                 {trade.comment && (
                   <div className="rounded-xl bg-white/[0.02] border border-gray-800 p-4 mb-4">
-                    <p className="text-gray-300 text-sm leading-relaxed italic">&ldquo;{trade.comment}&rdquo;</p>
+                    <p className="text-white text-sm leading-relaxed italic">&ldquo;{trade.comment}&rdquo;</p>
                   </div>
                 )}
 
@@ -1037,7 +1037,7 @@ function TradeCard({ trade, connectedUser }: { trade: SharedTrade; connectedUser
                                 <button onClick={() => { setEditingCommentIdx(null); setEditCommentText(""); }} className="text-gray-500 hover:text-gray-300 text-xs font-medium px-2">Cancel</button>
                               </div>
                             ) : (
-                              <p className="text-gray-300 text-sm mt-0.5">{c.text}</p>
+                              <p className="text-white text-sm mt-0.5">{c.text}</p>
                             )}
                           </div>
                           {isOwn && !isEditing && (
@@ -1390,7 +1390,7 @@ export default function CommunityPage() {
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 bg-gradient-to-r from-white via-orange-400 to-orange-600 bg-clip-text text-transparent">
             Community Hub
           </h1>
-          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+          <p className="text-lg text-white max-w-2xl mx-auto leading-relaxed">
             Browse shared paper trades and backtested strategies across all markets.
             Learn from the community and discover winning setups.
           </p>
