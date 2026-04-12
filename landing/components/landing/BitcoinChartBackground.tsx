@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { UTCTimestamp } from "lightweight-charts";
 
 /** Matches `globals.css` `--bg` */
@@ -74,7 +74,8 @@ async function fetchInitialCandles(): Promise<Candle[]> {
 
 function connectBinanceKlineStream(
   series: import("lightweight-charts").ISeriesApi<"Candlestick">,
-  getCancelled: () => boolean
+  getCancelled: () => boolean,
+  onBar: (open: number, close: number) => void
 ) {
   let ws: WebSocket | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -99,13 +100,16 @@ function connectBinanceKlineStream(
         const k = msg.k;
         if (!k || typeof k.t !== "number") return;
         const time = Math.floor(k.t / 1000) as UTCTimestamp;
+        const open = parseFloat(String(k.o));
+        const close = parseFloat(String(k.c));
         series.update({
           time,
-          open: parseFloat(String(k.o)),
+          open,
           high: parseFloat(String(k.h)),
           low: parseFloat(String(k.l)),
-          close: parseFloat(String(k.c)),
+          close,
         });
+        if (!getCancelled()) onBar(open, close);
       } catch {
         /* malformed tick */
       }
@@ -142,8 +146,19 @@ function connectBinanceKlineStream(
   };
 }
 
+function formatBtcUsd(price: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(price);
+}
+
 export default function BitcoinChartBackground() {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [priceLabel, setPriceLabel] = useState<string | null>(null);
+  const [candleTrend, setCandleTrend] = useState<"up" | "down" | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -210,14 +225,22 @@ export default function BitcoinChartBackground() {
         wickDownColor: "#ef4444",
       });
 
+      const applyQuote = (open: number, close: number) => {
+        if (getCancelled()) return;
+        setPriceLabel(formatBtcUsd(close));
+        setCandleTrend(close >= open ? "up" : "down");
+      };
+
       fetchInitialCandles().then((candles) => {
         if (cancelled || !chartBox.current) return;
         if (candles.length > 0) {
           series.setData(candles);
           chartBox.current.timeScale().fitContent();
+          const last = candles[candles.length - 1];
+          applyQuote(last.open, last.close);
         }
         if (getCancelled() || !chartBox.current) return;
-        disconnectWs = connectBinanceKlineStream(series, getCancelled);
+        disconnectWs = connectBinanceKlineStream(series, getCancelled, applyQuote);
       });
 
       ro = new ResizeObserver(resize);
@@ -241,11 +264,29 @@ export default function BitcoinChartBackground() {
       <div ref={wrapRef} className="bitcoin-chart-bg" aria-hidden />
       <div
         className="bitcoin-chart-bg-label"
-        role="note"
-        aria-label="Live Bitcoin BTC versus US dollar, one minute candlesticks"
+        role="status"
+        aria-live="polite"
+        aria-label={
+          priceLabel && candleTrend
+            ? `Bitcoin live, ${priceLabel}, current candle ${candleTrend === "up" ? "up" : "down"}`
+            : priceLabel
+              ? `Bitcoin live, ${priceLabel}`
+              : "Bitcoin live price loading"
+        }
       >
-        <span className="bitcoin-chart-bg-label-title">Bitcoin</span>
-        <span className="bitcoin-chart-bg-label-meta">BTC / USD · 1m candles · live</span>
+        <span className="bitcoin-chart-bg-label-title">Bitcoin live</span>
+        <span
+          className={
+            "bitcoin-chart-bg-label-price" +
+            (candleTrend === "up"
+              ? " bitcoin-chart-bg-label-price--up"
+              : candleTrend === "down"
+                ? " bitcoin-chart-bg-label-price--down"
+                : "")
+          }
+        >
+          {priceLabel ?? "—"}
+        </span>
       </div>
     </>
   );

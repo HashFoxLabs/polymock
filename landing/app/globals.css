@@ -46,22 +46,35 @@ body {
   pointer-events: none;
   top: 5.75rem;
   left: 1.25rem;
-  max-width: min(280px, calc(100vw - 2rem));
+  max-width: min(420px, calc(100vw - 2rem));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.65rem 0.85rem;
 }
 .bitcoin-chart-bg-label-title {
-  display: block;
   font-size: 0.65rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(249, 115, 22, 0.9);
+  color: var(--orange);
+  flex-shrink: 0;
 }
-.bitcoin-chart-bg-label-meta {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.75rem;
-  color: rgba(156, 163, 175, 0.95);
-  line-height: 1.35;
+.bitcoin-chart-bg-label-price {
+  font-size: clamp(1rem, 2.5vw, 1.35rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
+  transition: color 0.2s var(--ease);
+}
+/* Match candlestick series colors in BitcoinChartBackground.tsx */
+.bitcoin-chart-bg-label-price--up {
+  color: #22c55e;
+}
+.bitcoin-chart-bg-label-price--down {
+  color: #ef4444;
 }
 
 /* Community hub: glass panels (shared with /community UI) */
