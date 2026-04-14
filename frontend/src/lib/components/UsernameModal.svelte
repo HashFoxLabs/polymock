@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { supabase } from '$lib/supabase';
-
 	export let walletAddress: string;
 	export let onComplete: (username: string) => void;
 
@@ -26,35 +24,32 @@
 			return;
 		}
 
+		// Check availability
 		checking = true;
-		const { data: existing } = await supabase
-			.from('users')
-			.select('id')
-			.eq('username', trimmed)
-			.maybeSingle();
-
-		if (existing) {
-			error = 'Username already taken';
-			checking = false;
-			return;
-		}
+		const checkRes = await fetch(`/api/users?username=${encodeURIComponent(trimmed)}`);
+		const checkData = await checkRes.json();
 		checking = false;
 
-		saving = true;
-		const { error: insertErr } = await supabase
-			.from('users')
-			.upsert({
-				wallet_address: walletAddress,
-				username: trimmed
-			}, { onConflict: 'wallet_address' });
-
-		if (insertErr) {
-			error = insertErr.message;
-			saving = false;
+		if (checkData.taken) {
+			error = 'Username already taken';
 			return;
 		}
 
+		// Save via server-side API (bypasses Supabase RLS)
+		saving = true;
+		const saveRes = await fetch('/api/users', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ wallet_address: walletAddress, username: trimmed })
+		});
+		const saveData = await saveRes.json();
 		saving = false;
+
+		if (!saveRes.ok) {
+			error = saveData.error || 'Failed to save username';
+			return;
+		}
+
 		onComplete(trimmed);
 	}
 </script>

@@ -39,6 +39,11 @@
 	let sessionBadgeElement: HTMLElement;
 	let showInitPopup = false;
 	let lastCheckedWallet: string | null = null;
+	let showFundingPopup = false;
+	let fundingPopupSolBalance = 0;
+	let fundingPopupAddress = '';
+	let fundingPopupAirdropped = false;
+	let pendingPostConnect: (() => Promise<void>) | null = null;
 
 	walletStore.subscribe(value => {
 		const prevWallet = walletState.publicKey?.toString() ?? null;
@@ -262,31 +267,34 @@
 
 			const { publicKey, wallet, userInfo } = result;
 
-			// Embedded wallets start with 0 SOL — airdrop on devnet so they can init
+			// Embedded wallets start with 0 SOL — fund via our treasury endpoint
 			const conn = new Connection('https://api.devnet.solana.com', 'confirmed');
-			const balance = await conn.getBalance(publicKey);
-			if (balance < 0.2 * LAMPORTS_PER_SOL) {
-				console.log('[Web3Auth] Low balance (' + (balance / LAMPORTS_PER_SOL) + ' SOL), requesting devnet airdrop...');
-				let airdropSuccess = false;
-				for (let attempt = 0; attempt < 3 && !airdropSuccess; attempt++) {
-					try {
-						if (attempt > 0) await new Promise(r => setTimeout(r, 2000));
-						const sig = await conn.requestAirdrop(publicKey, 1 * LAMPORTS_PER_SOL);
-						await conn.confirmTransaction(sig, 'confirmed');
-						console.log('[Web3Auth] Airdrop confirmed:', sig);
-						airdropSuccess = true;
-					} catch (err) {
-						console.warn(`[Web3Auth] Airdrop attempt ${attempt + 1} failed:`, err);
+			const balanceBefore = await conn.getBalance(publicKey);
+			let airdropped = false;
+
+			if (balanceBefore < 0.2 * LAMPORTS_PER_SOL) {
+				console.log('[Web3Auth] Low balance (' + (balanceBefore / LAMPORTS_PER_SOL) + ' SOL), requesting treasury airdrop...');
+				try {
+					const res = await fetch('/api/airdrop', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ address: publicKey.toString() })
+					});
+					const data = await res.json();
+					if (res.ok && data.success) {
+						console.log('[Web3Auth] Treasury airdrop confirmed:', data.signature);
+						airdropped = true;
+					} else {
+						console.warn('[Web3Auth] Treasury airdrop failed:', data.error);
 					}
-				}
-				if (!airdropSuccess) {
-					// Verify balance again — airdrop may have landed despite confirmation error
-					const updatedBalance = await conn.getBalance(publicKey);
-					if (updatedBalance < 0.2 * LAMPORTS_PER_SOL) {
-						alert('Unable to fund your wallet with devnet SOL. The devnet faucet may be rate-limited. Please try again in a few minutes, or manually airdrop SOL to:\n\n' + publicKey.toString());
-					}
+				} catch (err) {
+					console.warn('[Web3Auth] Treasury airdrop request failed:', err);
 				}
 			}
+
+			// Fetch final balance to show in popup
+			const finalBalance = await conn.getBalance(publicKey);
+			const finalSol = finalBalance / LAMPORTS_PER_SOL;
 
 			// Set auth store with user info from Web3Auth
 			authStore.setUser({
@@ -302,12 +310,41 @@
 			const adapterWrapper = createWeb3AuthWalletAdapter(wallet, publicKey);
 			setWalletAdapter(adapterWrapper as any);
 			await updateWalletConnection();
-			await handlePostConnect(adapterWrapper);
+
+			// Show funding popup before proceeding to init/session popups
+			fundingPopupSolBalance = finalSol;
+			fundingPopupAddress = publicKey.toString();
+			fundingPopupAirdropped = airdropped;
+			pendingPostConnect = () => handlePostConnect(adapterWrapper);
+			showFundingPopup = true;
 		} catch (error: any) {
 			console.error('Login failed:', error);
 			if (error.message !== 'Authentication cancelled') {
 				alert(`Login failed: ${error.message}`);
 			}
+		}
+	}
+
+	async function dismissFundingPopup() {
+		showFundingPopup = false;
+		if (pendingPostConnect) {
+			const fn = pendingPostConnect;
+			pendingPostConnect = null;
+			await fn();
+		}
+	}
+
+	async function copyToClipboard(text: string) {
+		try {
+			await navigator.clipboard.writeText(text);
+		} catch {
+			// fallback for older browsers
+			const el = document.createElement('textarea');
+			el.value = text;
+			document.body.appendChild(el);
+			el.select();
+			document.execCommand('copy');
+			document.body.removeChild(el);
 		}
 	}
 
@@ -600,6 +637,76 @@
 
 	</div>
 </div>
+
+<!-- Devnet wallet funding popup — shown after Quick Login / Web3Auth connect -->
+{#if showFundingPopup}
+	<div class="session-overlay" role="dialog" tabindex="0" on:keydown={(e) => e.key === 'Escape' && dismissFundingPopup()}>
+		<div class="session-modal funding-modal" on:click|stopPropagation on:keydown|stopPropagation role="dialog" tabindex="-1">
+			<div class="funding-header">
+				<div class="funding-network-badge">DEVNET</div>
+				<h3 class="session-title">Your Embedded Wallet</h3>
+			</div>
+
+			<!-- SOL balance row -->
+			<div class="funding-balance-row">
+				<svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="sol-icon">
+					<circle cx="12" cy="12" r="12" fill="#9945FF"/>
+					<path d="M6.5 15.5h10l-2 2h-10l2-2zM6.5 11h10l-2 2h-10l2-2zM14.5 6.5h-10l2-2h10l-2 2z" fill="white"/>
+				</svg>
+				<div class="funding-balance-info">
+					<span class="funding-balance-amount">{fundingPopupSolBalance.toFixed(4)} SOL</span>
+					<span class="funding-balance-label">Devnet balance</span>
+				</div>
+				{#if fundingPopupAirdropped}
+					<span class="funding-airdrop-badge">Airdropped</span>
+				{/if}
+			</div>
+
+			<!-- Explanation -->
+			<p class="session-desc funding-desc">
+				This is your <strong>devnet embedded wallet</strong> — a non-custodial Solana wallet created when you logged in. It uses <strong>test SOL</strong> with no real value.
+				{#if fundingPopupSolBalance < 0.05}
+					<br/><br/>Your balance is low. Use the Solana faucet to add more devnet SOL for free.
+				{/if}
+			</p>
+
+			<!-- Address + copy -->
+			<div class="funding-address-block">
+				<span class="funding-address-label">Wallet address</span>
+				<div class="funding-address-row">
+					<code class="funding-address">{fundingPopupAddress}</code>
+					<button class="funding-copy-btn" title="Copy address" on:click={() => copyToClipboard(fundingPopupAddress)}>
+						<svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+							<rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+							<path d="M2 10V2.5A.5.5 0 012.5 2H10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+						</svg>
+					</button>
+				</div>
+			</div>
+
+			<!-- Faucet link -->
+			<a
+				href="https://faucet.solana.com/"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="funding-faucet-link"
+			>
+				<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+					<path d="M8 2C5.6 2 3 4 3 7c0 2.5 2.2 5 5 7 2.8-2 5-4.5 5-7 0-3-2.6-5-5-5z" stroke="currentColor" stroke-width="1.4"/>
+					<path d="M8 5v4M6 7h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+				</svg>
+				Get free devnet SOL at faucet.solana.com
+				<svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+					<path d="M2 10L10 2M10 2H5M10 2V7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+				</svg>
+			</a>
+
+			<button class="session-primary-btn enable-btn" on:click={dismissFundingPopup}>
+				Got it, continue
+			</button>
+		</div>
+	</div>
+{/if}
 
 <!-- Account initialization popup -->
 {#if showInitPopup && walletState.connected && !walletState.userAccountInitialized}
@@ -1021,6 +1128,158 @@
 
 	.session-dropdown-item svg {
 		flex-shrink: 0;
+	}
+
+	/* Funding popup styles */
+	.funding-modal {
+		max-width: 460px;
+	}
+
+	.funding-header {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		margin-bottom: 4px;
+	}
+
+	.funding-network-badge {
+		background: rgba(153, 69, 255, 0.15);
+		color: #9945FF;
+		border: 1px solid rgba(153, 69, 255, 0.4);
+		border-radius: 6px;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 1px;
+		padding: 3px 10px;
+	}
+
+	.funding-balance-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		background: rgba(153, 69, 255, 0.08);
+		border: 1px solid rgba(153, 69, 255, 0.2);
+		border-radius: 12px;
+		padding: 14px 18px;
+		margin: 12px 0;
+	}
+
+	.sol-icon {
+		flex-shrink: 0;
+	}
+
+	.funding-balance-info {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		flex: 1;
+	}
+
+	.funding-balance-amount {
+		font-size: 22px;
+		font-weight: 700;
+		color: #E8E8E8;
+		font-family: 'SF Mono', Consolas, monospace;
+	}
+
+	.funding-balance-label {
+		font-size: 12px;
+		color: #8B92AB;
+	}
+
+	.funding-airdrop-badge {
+		background: rgba(0, 208, 132, 0.15);
+		color: #00D084;
+		border: 1px solid rgba(0, 208, 132, 0.3);
+		border-radius: 6px;
+		font-size: 11px;
+		font-weight: 600;
+		padding: 3px 8px;
+		white-space: nowrap;
+	}
+
+	.funding-desc {
+		text-align: left;
+		margin: 0 0 16px 0;
+	}
+
+	.funding-address-block {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin-bottom: 14px;
+	}
+
+	.funding-address-label {
+		font-size: 11px;
+		color: #8B92AB;
+		text-transform: uppercase;
+		letter-spacing: 0.5px;
+	}
+
+	.funding-address-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid #333;
+		border-radius: 8px;
+		padding: 8px 12px;
+	}
+
+	.funding-address {
+		font-family: 'SF Mono', Consolas, monospace;
+		font-size: 11px;
+		color: #A0A0A0;
+		word-break: break-all;
+		flex: 1;
+	}
+
+	.funding-copy-btn {
+		background: transparent;
+		border: none;
+		color: #8B92AB;
+		cursor: pointer;
+		padding: 4px;
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		flex-shrink: 0;
+		transition: color 0.2s;
+	}
+
+	.funding-copy-btn:hover {
+		color: #E8E8E8;
+	}
+
+	.funding-faucet-link {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: rgba(249, 115, 22, 0.08);
+		border: 1px solid rgba(249, 115, 22, 0.3);
+		border-radius: 10px;
+		padding: 12px 16px;
+		color: #F97316;
+		text-decoration: none;
+		font-size: 13px;
+		font-weight: 600;
+		margin-bottom: 20px;
+		transition: background 0.2s, border-color 0.2s;
+	}
+
+	.funding-faucet-link:hover {
+		background: rgba(249, 115, 22, 0.15);
+		border-color: rgba(249, 115, 22, 0.5);
+	}
+
+	.funding-faucet-link svg:first-child {
+		flex-shrink: 0;
+	}
+
+	.funding-faucet-link svg:last-child {
+		margin-left: auto;
 	}
 
 	/* Session popup styles */

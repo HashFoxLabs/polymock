@@ -347,12 +347,15 @@
 
 			const avatarUrl = urlData.publicUrl + '?t=' + Date.now();
 
-			const { error: updateErr } = await supabase
-				.from('users')
-				.update({ avatar_url: avatarUrl })
-				.eq('wallet_address', walletAddress);
-
-			if (updateErr) throw new Error(updateErr.message);
+			const res = await fetch('/api/users', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ wallet_address: walletAddress, avatar_url: avatarUrl })
+			});
+			if (!res.ok) {
+				const d = await res.json();
+				throw new Error(d.error || 'Failed to save avatar');
+			}
 
 			profileAvatarUrl = avatarUrl;
 			// Update wallet store so Navbar avatar reflects the change
@@ -406,12 +409,15 @@
 
 			const bannerUrl = urlData.publicUrl + '?t=' + Date.now();
 
-			const { error: updateErr } = await supabase
-				.from('users')
-				.update({ banner_url: bannerUrl })
-				.eq('wallet_address', walletAddress);
-
-			if (updateErr) throw new Error(updateErr.message);
+			const res = await fetch('/api/users', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ wallet_address: walletAddress, banner_url: bannerUrl })
+			});
+			if (!res.ok) {
+				const d = await res.json();
+				throw new Error(d.error || 'Failed to save banner');
+			}
 
 			profileBannerUrl = bannerUrl;
 		} catch (err: any) {

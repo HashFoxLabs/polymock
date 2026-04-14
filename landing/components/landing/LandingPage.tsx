@@ -65,7 +65,7 @@ export default function LandingPage() {
             </h2>
             <p className="platform-text">
               Every trade is recorded on-chain via Solana, verifiable and shareable. Live data from
-              Pyth, Polymarket, TradingView and Twelve Data. Your performance is public proof. Share
+              Pyth, Synthesis, TradingView and Twelve Data. Your performance is public proof. Share
               your edge and go live when the numbers back you up.
             </p>
           </div>
@@ -76,8 +76,8 @@ export default function LandingPage() {
               <div className="platform-stat-label">On-Chain Execution</div>
             </div>
             <div className="platform-stat reveal">
-              <img src="/poly.png" className="platform-logo" alt="Polymarket" />
-              <div className="platform-stat-value orange">Polymarket</div>
+              <img src="/synthesis.png" className="platform-logo" alt="Synthesis" />
+              <div className="platform-stat-value orange">Synthesis</div>
               <div className="platform-stat-label">Prediction Markets</div>
             </div>
             <div className="platform-stat reveal">
