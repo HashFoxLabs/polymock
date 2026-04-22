@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "HashFox Labs — Learn Any Market, Without Risk",
   description:
-    "HashFox Labs is the universal sandbox for traders. Backtest strategies and paper-trade across crypto, prediction markets, forex, and stocks — all in one place before going live.",
+    "Where traders prove their edge and build an un-fakeable reputation without risking capital. Simulate strategies across crypto and prediction markets, climb the onchain leaderboard, and let your track record speak for itself",
   icons: {
     icon: [
       { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },

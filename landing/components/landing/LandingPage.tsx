@@ -22,9 +22,9 @@ export default function LandingPage() {
             Without Risk
           </h1>
           <p className="hero-sub">
-            HashFox Labs is the universal sandbox for traders. Backtest strategies and paper-trade
-            across crypto, prediction markets, forex, and stocks, all in one place before going
-            live.
+            Where traders prove their edge and build a reputation without risking
+            capital. Simulate strategies across crypto and prediction markets, climb the onchain
+            leaderboard, and let your track record speak for itself
           </p>
           <div className="hero-actions">
             <a href="https://polymock.app/" target="_blank" rel="noreferrer" className="btn-primary">
@@ -59,14 +59,14 @@ export default function LandingPage() {
           <div className="platform-left reveal-left">
             <div className="platform-label">The Platform</div>
             <h2 className="platform-heading">
-              Master any market,
+              Learn and compet,
               <br />
-              <em>risk-free</em>
+              <em>risk free</em>
             </h2>
             <p className="platform-text">
-              Every trade is recorded on-chain via Solana, verifiable and shareable. Live data from
-              Pyth, Synthesis, TradingView and Twelve Data. Your performance is public proof. Share
-              your edge and go live when the numbers back you up.
+              Learn, test, and compete in real market conditions. With real-time data and onchain
+              execution, your simulation history becomes a verifiable track record. Rank up against
+              other traders, share your edge, and prove your profitability to the world
             </p>
           </div>
           <div className="platform-right stagger-children">
@@ -76,7 +76,7 @@ export default function LandingPage() {
               <div className="platform-stat-label">On-Chain Execution</div>
             </div>
             <div className="platform-stat reveal">
-              <img src="/synthesis.png" className="platform-logo" alt="Synthesis" />
+              <img src="/synthesis.png" className="platform-logo synthesis-logo" alt="Synthesis" />
               <div className="platform-stat-value orange">Synthesis</div>
               <div className="platform-stat-label">Prediction Markets</div>
             </div>
@@ -213,11 +213,11 @@ export default function LandingPage() {
         <canvas id="blob-canvas" />
         <div className="mp-text reveal">
           <div className="mp-badge">Coming Soon</div>
-          <h2 className="mp-title">Multi-Platform Integration</h2>
+          <h2 className="mp-title">The Unified Live Terminal</h2>
           <p className="mp-sub">
-            We&apos;re building a unified platform to paper-trade across all markets: crypto,
-            prediction markets, forex, and stocks, with one single balance. Trade everything from
-            one place.
+            We are bringing real-money execution to the platform. Soon, you will be able to trade
+            crypto, forex, and prediction markets with real capital. Take your proven onchain track
+            record and flip to live trading, directly from the same dashboard.
           </p>
         </div>
       </section>

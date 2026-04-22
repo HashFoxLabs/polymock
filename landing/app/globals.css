@@ -275,21 +275,24 @@ body {
 }
 .platform-stat {
   border-left: 2px solid rgba(249,115,22,0.2);
-  padding-left: 1.25rem;
+  padding-left: 1.5rem;
   transition: border-color 0.4s;
 }
 .platform-stat:hover { border-left-color: var(--orange); }
 .platform-logo {
-  width: 40px; height: 40px; object-fit: contain;
-  margin-bottom: 0.75rem; display: block;
+  width: 56px; height: 56px; object-fit: contain;
+  margin-bottom: 0.9rem; display: block;
+}
+.synthesis-logo {
+  filter: invert(1);
 }
 .platform-stat-value {
-  font-size: 1.1rem; font-weight: 700; line-height: 1;
-  margin-bottom: 0.4rem;
+  font-size: 1.35rem; font-weight: 800; line-height: 1.05;
+  margin-bottom: 0.5rem;
 }
 .platform-stat-label {
-  font-size: 0.8rem; color: #ffffff;
-  line-height: 1.4;
+  font-size: 0.95rem; color: #ffffff;
+  line-height: 1.45;
 }
 
 /* ── BLOB PLATFORM SECTION ── */
