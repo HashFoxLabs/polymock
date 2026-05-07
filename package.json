@@ -2,9 +2,9 @@
   "name": "polymock-monorepo",
   "private": true,
   "scripts": {
-    "build": "npm ci --prefix landing && npm run --prefix landing build",
-    "build:landing": "npm ci --prefix landing && npm run --prefix landing build",
-    "build:frontend": "npm ci --prefix frontend && npm run --prefix frontend build",
+    "build": "npm install --prefix landing && npm run --prefix landing build",
+    "build:landing": "npm install --prefix landing && npm run --prefix landing build",
+    "build:frontend": "npm install --prefix landing && npm run --prefix landing build",
     "dev:landing": "npm run --prefix landing dev",
     "dev:frontend": "npm run --prefix frontend dev"
   }

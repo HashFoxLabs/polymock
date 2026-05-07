@@ -488,7 +488,7 @@ function makeDiamond() {
     return pos;
 }
 
-shapes.push(makeGlobe());
+shapes.push(makeDiamond());
 
 const _whiteColors = makeWhiteColors();
 shapeColors.push(_whiteColors);

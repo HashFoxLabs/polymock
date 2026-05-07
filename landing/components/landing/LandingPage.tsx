@@ -15,11 +15,9 @@ export default function LandingPage() {
       <section id="hero-section">
         <div id="apps-section" aria-hidden style={{ height: 0, overflow: "hidden" }} />
         <div className="hero-content">
-          <div className="hero-badge">From practice to live Execution</div>
+          <div className="hero-badge">The On-Chain Proving Ground</div>
           <h1 className="hero-title">
-            Learn Any Market,
-            <br />
-            Without Risk
+            Build a Track Record That Pays
           </h1>
           <p className="hero-sub">
             Where traders prove their edge and build a reputation without risking
@@ -107,18 +105,18 @@ export default function LandingPage() {
       <section id="paper-trading-section" className="how-section-standalone">
         <div className="section-inner">
           <div className="section-header reveal">
-            <h2 className="paper-title">What is Paper Trading?</h2>
+            <h2 className="paper-title">Competition System</h2>
             <p
               className="hero-sub"
               style={{ animation: "none", marginBottom: "1rem" }}
             >
-              Paper trading allows you to simulate real trading with virtual money. It&apos;s the
-              perfect way to test strategies, learn market dynamics, and build confidence before
-              risking actual capital.
+              Compete in recurring trading competitions where every trade you make on virtual
+              capital counts toward your ranking. Climb the onchain leaderboard, prove your edge
+              against traders worldwide, and earn real SOL prizes paid out directly to your wallet.
             </p>
             <p className="hero-sub" style={{ animation: "none", marginBottom: 0 }}>
-              Our platform provides real-time market data from prediction markets and crypto
-              exchanges, giving you an authentic trading experience without the financial risk.
+              Each season features a transparent prize pool distributed to top performers based on
+              verifiable on-chain results — just your skills, your track record, and real rewards.
             </p>
           </div>
           <div className="paper-chart-wrap reveal">
@@ -212,14 +210,37 @@ export default function LandingPage() {
       <section id="blob-platform-section">
         <canvas id="blob-canvas" />
         <div className="mp-text reveal">
-          <div className="mp-badge">Coming Soon</div>
-          <h2 className="mp-title">The Unified Live Terminal</h2>
+          <div className="mp-badge">Mint Your Edge</div>
+          <h2 className="mp-title">Prove That You&apos;re Great</h2>
           <p className="mp-sub">
-            We are bringing real-money execution to the platform. Soon, you will be able to trade
-            crypto, forex, and prediction markets with real capital. Take your proven onchain track
-            record and flip to live trading, directly from the same dashboard.
+            Mint your performance as an NFT trading card and share it anywhere. Each card is
+            generated from your verifiable on-chain track record — win rate, P&amp;L, top trades,
+            ranking, and season stats, so you can flex your edge, with proof to back it up.
           </p>
         </div>
+      </section>
+
+      <section
+        className="reveal"
+        style={{
+          padding: "4rem 1.5rem",
+          display: "flex",
+          justifyContent: "center",
+          background: "#000",
+          position: "relative",
+          zIndex: 10,
+        }}
+      >
+        <img
+          src="/card.png"
+          alt="HashFox NFT trading card"
+          style={{
+            display: "block",
+            maxWidth: 420,
+            width: "100%",
+            height: "auto",
+          }}
+        />
       </section>
 
       <div id="content">

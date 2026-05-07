@@ -1,0 +1,14 @@
+# Cloudflare Pages — static export from Next.js (`output: "export"` → `out/`).
+#
+# In the dashboard (Workers & Pages → Create → Connect to Git), set:
+#   Root directory:        landing
+#   Build command:         npm install && npm run build
+#   Build output directory: out   (or leave blank if Cloudflare reads this file)
+#   Environment variables:  see env.example.cloudflare in this folder
+#
+# Optional CLI: from this directory, after `npm run build`:
+#   npx wrangler pages deploy out --project-name=<your-pages-project-name>
+
+name = "hashfox-landing"
+compatibility_date = "2025-04-01"
+pages_build_output_dir = "out"
