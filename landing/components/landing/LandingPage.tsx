@@ -116,7 +116,7 @@ export default function LandingPage() {
             </p>
             <p className="hero-sub" style={{ animation: "none", marginBottom: 0 }}>
               Each season features a transparent prize pool distributed to top performers based on
-              verifiable on-chain results — just your skills, your track record, and real rewards.
+              verifiable on-chain results, just your skills, your track record, and real rewards.
             </p>
           </div>
           <div className="paper-chart-wrap reveal">
@@ -214,7 +214,7 @@ export default function LandingPage() {
           <h2 className="mp-title">Prove That You&apos;re Great</h2>
           <p className="mp-sub">
             Mint your performance as an NFT trading card and share it anywhere. Each card is
-            generated from your verifiable on-chain track record — win rate, P&amp;L, top trades,
+            generated from your verifiable on-chain track record: win rate, P&amp;L, top trades,
             ranking, and season stats, so you can flex your edge, with proof to back it up.
           </p>
         </div>
